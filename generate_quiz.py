@@ -321,6 +321,7 @@ function genreFilter(genre) {
 function spiceFilter(spice) {
   if (!spice || spice === 'any_spice') return () => true;
   return b => {
+    if (!b.sp) return true;  // ingen romance.io data → altid med
     if (spice === 'low')    return b.sp >= 1 && b.sp <= 2;
     if (spice === 'medium') return b.sp === 3;
     if (spice === 'high')   return b.sp >= 4;
