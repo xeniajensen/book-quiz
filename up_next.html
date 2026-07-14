@@ -43,7 +43,7 @@ input[type=range]{width:140px}
 <h1>Up Next — from your TBR</h1>
 <p class="sub" id="sub"></p>
 <div class="vibe" id="vibe">Reading your recent finishes…</div>
-<p class="note">Biased toward <b>deep cuts</b> — well-rated books few people have read. Hit <b>↻</b> on any card for a fresh option.</p>
+<p class="note">Each card is a <b>random draw</b> from books that fit it — popular and obscure at equal odds. Only 💎 Deep cut and 🔥 Hype check deliberately lean. Hit <b>↻</b> for a fresh option.</p>
 
 <div class="cards" id="picks"></div>
 
@@ -78,18 +78,19 @@ const covImg=(b,cls)=>{const u=COV[b.i];return u?`<img class="${cls}" src="${u}"
 const dc=b=>(b.r||3.5)+0.4*Math.max(0,3-Math.log10((b.rd||300)+10));
 const byId=Object.fromEntries(DATA.map(b=>[b.i,b]));
 
+// Everyday picks: uniform-random draw from books that FIT the card (equal odds, popular or
+// obscure). Only Deep cut and Hype check deliberately lean. Light rating floors keep out duds.
 const PICKS=[
- {k:'nowait',ic:'⚡',lb:'No waiting',pool:()=>DATA.filter(b=>availNow(b)&&b.r).sort((a,b)=>dc(b)-dc(a)),n:18,why:b=>`On ${b.s} right now, no waitlist — and well-rated without being the usual bestseller.`},
- {k:'quick',ic:'🎧',lb:'Quick listen',pool:()=>DATA.filter(b=>availNow(b)&&b.hrs&&b.hrs<=9&&b.r).sort((a,b)=>dc(b)-dc(a)),n:15,why:b=>`Just ${b.hrs} hours on audio and available now — an easy one to finish.`},
- {k:'wreck',ic:'😭',lb:'Wreck me',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&has(b,'sad','angst','emotional','grief','heartbreaking','tear')).sort((a,b)=>dc(b)-dc(a)),n:18,why:b=>`Emotional and a little devastating — for when you want to feel something. Tissues ready.`},
- {k:'cozy',ic:'☕',lb:'Cozy night',pool:()=>DATA.filter(b=>availNow(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')).sort((a,b)=>dc(b)-dc(a)),n:18,why:b=>`Low-stakes comfort you can start now. Pour a drink and relax.`},
- {k:'series',ic:'📚',lb:'Start a series',pool:()=>DATA.filter(b=>b.sn===1&&b.r).sort((a,b)=>dc(b)-dc(a)),n:18,why:b=>`${b.se} #1 — kick off a new series, and not the obvious one.`},
- {k:'deep',ic:'💎',lb:'Deep cut',pool:()=>DATA.filter(b=>b.r&&b.r>=4.0&&b.rd!=null&&b.rd<4000).sort((a,b)=>b.r-a.r),n:20,why:b=>`Only ${b.rd?b.rd.toLocaleString():'a few'} readers but rated ${b.r} — a genuine hidden gem.`},
- {k:'backlog',ic:'🕰️',lb:'Longest on your TBR',pool:()=>DATA.filter(b=>b.d&&b.r).sort((a,b)=>a.d.localeCompare(b.d)),n:20,why:b=>`Been on your list since ${b.d}. Maybe it's finally time.`},
- {k:'spicy',ic:'🌶️',lb:'Spicy pick',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&availNow(b)).sort((a,b)=>dc(b)-dc(a)),n:15,why:b=>`Spice ${b.sp}/5 and available now. Turn up the heat.`},
- {k:'hype',ic:'🔥',lb:'Hype check',pool:()=>DATA.filter(b=>b.rd!=null).sort((a,b)=>b.rd-a.rd),n:15,why:b=>`The one deliberately popular pick — ${b.rd?b.rd.toLocaleString():'lots of'} readers. See if the hype holds up.`},
- {k:'wild',ic:'🃏',lb:'Wildcard',pool:()=>DATA.filter(b=>b.r&&(b.rd==null||b.rd<8000)),n:9999,rand:true,why:b=>`No filters, just a random deep cut. Trust the chaos.`},
- {k:'surprise',ic:'🎲',lb:'Surprise me',pool:()=>DATA.filter(b=>b.r),n:9999,rand:true,why:b=>`A totally random roll of your whole TBR.`},
+ {k:'nowait',ic:'⚡',lb:'No waiting',pool:()=>DATA.filter(b=>availNow(b)&&b.r&&b.r>=3.5),why:b=>`On ${b.s} right now — no waitlist, start it whenever.`},
+ {k:'quick',ic:'🎧',lb:'Quick listen',pool:()=>DATA.filter(b=>availNow(b)&&b.hrs&&b.hrs<=9&&b.r&&b.r>=3.4),why:b=>`Just ${b.hrs} hours on audio and available now — an easy one to finish.`},
+ {k:'wreck',ic:'😭',lb:'Wreck me',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&has(b,'sad','angst','emotional','grief','heartbreaking','tear')),why:b=>`Emotional and a little devastating — for when you want to feel something.`},
+ {k:'cozy',ic:'☕',lb:'Cozy night',pool:()=>DATA.filter(b=>availNow(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')),why:b=>`Low-stakes comfort you can start now. Pour a drink and relax.`},
+ {k:'series',ic:'📚',lb:'Start a series',pool:()=>DATA.filter(b=>b.sn===1&&b.r&&b.r>=3.5),why:b=>`${b.se} #1 — kick off a new series.`},
+ {k:'deep',ic:'💎',lb:'Deep cut',pool:()=>DATA.filter(b=>b.r&&b.r>=4.0&&b.rd!=null&&b.rd<4000),why:b=>`Only ${b.rd?b.rd.toLocaleString():'a few'} readers but rated ${b.r} — a hidden gem. (This card leans obscure on purpose.)`},
+ {k:'backlog',ic:'🕰️',lb:'Longest on your TBR',pool:()=>DATA.filter(b=>b.d&&b.r).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Been on your list since ${b.d}. Maybe it's finally time.`},
+ {k:'spicy',ic:'🌶️',lb:'Spicy pick',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&availNow(b)),why:b=>`Spice ${b.sp}/5 and available now. Turn up the heat.`},
+ {k:'hype',ic:'🔥',lb:'Hype check',pool:()=>DATA.filter(b=>b.rd!=null).sort((a,b)=>b.rd-a.rd).slice(0,25),why:b=>`One of the most-read on your list — ${b.rd?b.rd.toLocaleString():'lots of'} readers. See if the hype holds. (This card leans popular on purpose.)`},
+ {k:'surprise',ic:'🎲',lb:'Surprise me',pool:()=>DATA.filter(b=>b.r),why:b=>`A totally random roll of your whole TBR — popular or obscure, equal odds.`},
 ];
 const idx={};
 function card(label,b,why,cyc,ai){return `<div class="card${ai?' ai':''}">${covImg(b,'cov')}<div class="body">
@@ -108,12 +109,12 @@ function renderPicks(){
      const pk=list[window._mlIdx%list.length];
      const el=document.createElement('div');el.innerHTML=card('🤖 Your vibe',byId[pk.id],pk.reason||'',list.length>1?'<button class="cyc" id="mlcyc">↻</button>':'',true);host.appendChild(el.firstChild);}}
  PICKS.forEach(p=>{const pool=p.pool();if(!pool.length)return;
-   if(idx[p.k]==null)idx[p.k]=p.rand?Math.floor(Math.random()*pool.length):Math.floor(Math.random()*Math.min(p.n,pool.length));
+   if(idx[p.k]==null)idx[p.k]=Math.floor(Math.random()*pool.length);
    const b=pool[Math.min(idx[p.k],pool.length-1)];
    const el=document.createElement('div');el.innerHTML=card(`${p.ic} ${p.lb}`,b,p.why(b),`<button class="cyc" data-k="${p.k}">↻</button>`,false);host.appendChild(el.firstChild);});
  const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]);window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
  host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool();
-   idx[p.k]=p.rand?Math.floor(Math.random()*pool.length):Math.floor(Math.random()*Math.min(p.n,pool.length));renderPicks();});
+   idx[p.k]=Math.floor(Math.random()*pool.length);renderPicks();});
 }
 function applyML(vibe,picks){window._ml={vibe:vibe,picks:picks};window._mlIdx=null;
  const v=document.getElementById('vibe');if(v)v.innerHTML=vibe?('<b>Your vibe right now:</b> “'+vibe+'”'):'';renderPicks();}
