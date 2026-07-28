@@ -27,11 +27,27 @@ BAKED = {
 }
 WORKER = "https://lucky-cloud-343c.xenia-9cc.workers.dev"
 ALL_TBR_LIST = 471213
+
+# Baked "Something completely different" — deterministic anti-vibe fallback for the
+# web (non-Cowork) view: light/funny/low-angst books, the opposite of the usual reads.
+# Live in Cowork this is replaced by an AI pick; refreshed weekly via .ml.json if present.
+_LIGHT = ('funny', 'humor', 'humour', 'lighthearted', 'light-hearted', 'rom-com', 'romantic comedy',
+          'comedy', 'cozy', 'feel-good', 'feel good', 'heartwarming', 'banter', 'cute', 'wholesome', 'whimsical')
+_HEAVY = ('angst', 'sad', 'grief', 'dark', 'heartbreaking', 'tragic', 'tear', 'trauma', 'emotional')
+def _has(b, kws): t = (b.get('tags') or ''); return any(k in t for k in kws)
+_opp = sorted([b for b in data if b.get('rating') and b['rating'] >= 3.6 and _has(b, _LIGHT) and not _has(b, _HEAVY)],
+              key=lambda b: -(b['rating'] or 0))
+BAKED_OPP = {
+  "vibe": "The opposite of your usual: light, funny, low-angst reads — banter over heartbreak, for when you want to flip the mood.",
+  "picks": [{"id": b["id"], "reason": "Light, funny and low on angst — a palate-cleanser from your usual emotional reads."} for b in _opp[:5]],
+}
+
 if os.path.exists('.ml.json'):
     try:
         _ml = json.load(open('.ml.json'))
         if _ml.get('recent'): RECENT = _ml['recent']
         if _ml.get('vibe') and _ml.get('picks'): BAKED = {"vibe": _ml['vibe'], "picks": _ml['picks']}
+        if _ml.get('opp_vibe') and _ml.get('opp_picks'): BAKED_OPP = {"vibe": _ml['opp_vibe'], "picks": _ml['opp_picks']}
     except Exception: pass
 
 CONT = {}
@@ -43,7 +59,7 @@ slim = [{"i": b["id"], "t": b["title"], "a": b["author"], "s": b["source"], "av"
          "r": round(b["rating"], 2) if b["rating"] else None, "hrs": b["hrs"], "p": b.get("pages"),
          "sp": b["spice"], "se": b["series"], "sn": b["snum"], "d": b["dateAdded"], "lb": b["libby"],
          "rd": b["readers"], "tg": b["tags"], "sl": b["slug"]} for b in data]
-PAYLOAD = json.dumps({"books": slim, "recent": RECENT, "baked": BAKED, "cont": CONT, "worker": WORKER, "list": ALL_TBR_LIST}, ensure_ascii=False)
+PAYLOAD = json.dumps({"books": slim, "recent": RECENT, "baked": BAKED, "bakedOpp": BAKED_OPP, "cont": CONT, "worker": WORKER, "list": ALL_TBR_LIST}, ensure_ascii=False)
 
 HTML = r'''<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Up Next — from your TBR</title><style>
@@ -121,7 +137,7 @@ input[type=range]{width:140px}
 <div class="foot" id="foot"></div>
 </div>
 <script>
-const P=__DATA__; const DATA=P.books; const RECENT=P.recent; const BAKED=P.baked; const CONT=P.cont||{}; const COV={};
+const P=__DATA__; const DATA=P.books; const RECENT=P.recent; const BAKED=P.baked; const BAKED_OPP=P.bakedOpp||{picks:[]}; const CONT=P.cont||{}; const COV={};
 const has=(b,...kw)=>{const t=(b.tg||'');return kw.some(k=>t.includes(k));};
 const availNow=b=>b.av==='now'; const availSoon=b=>b.av==='now'||b.av==='short';
 const srcBadge=b=>`<span class="badge src-${b.s}">${b.s}</span>`;
@@ -166,33 +182,44 @@ function renderPicks(){
    if(list.length){ if(window._mlIdx==null)window._mlIdx=Math.floor(Math.random()*list.length);
      const pk=list[window._mlIdx%list.length];
      const el=document.createElement('div');el.innerHTML=card('🤖 Your vibe',byId[pk.id],pk.reason||'',list.length>1?'<button class="cyc" id="mlcyc">↻</button>':'',true);host.appendChild(el.firstChild);}}
+ // Anti-vibe card, right after the vibe card
+ const opp=window._opp;
+ if(opp&&opp.picks){const list=opp.picks.filter(pk=>byId[pk.id]);
+   if(list.length){ if(window._oppIdx==null)window._oppIdx=Math.floor(Math.random()*list.length);
+     const pk=list[window._oppIdx%list.length];
+     const el=document.createElement('div');el.innerHTML=card('🔀 Something completely different',byId[pk.id],pk.reason||'',list.length>1?'<button class="cyc" id="oppcyc">↻</button>':'',true);host.appendChild(el.firstChild);}}
  PICKS.forEach(p=>{const pool=p.pool();if(!pool.length)return;
    if(idx[p.k]==null)idx[p.k]=Math.floor(Math.random()*pool.length);
    const b=pool[Math.min(idx[p.k],pool.length-1)];
    const el=document.createElement('div');el.innerHTML=card(`${p.ic} ${p.lb}`,b,p.why(b),`<button class="cyc" data-k="${p.k}">↻</button>`,false);host.appendChild(el.firstChild);});
  const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]);window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
+ const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]);window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
  host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool();
    idx[p.k]=Math.floor(Math.random()*pool.length);renderPicks();});
 }
 function applyML(vibe,picks){window._ml={vibe:vibe,picks:picks};window._mlIdx=null;
  const v=document.getElementById('vibe');if(v)v.innerHTML=vibe?('<b>Your vibe right now:</b> “'+vibe+'”'):'';renderPicks();}
+function applyOpp(vibe,picks){window._opp={vibe:vibe,picks:picks};window._oppIdx=null;renderPicks();}
 async function loadML(){
- if(!(window.cowork&&window.cowork.askClaude)){ applyML(BAKED.vibe,BAKED.picks); return; }
+ if(!(window.cowork&&window.cowork.askClaude)){ applyML(BAKED.vibe,BAKED.picks); applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks); return; }
  document.getElementById('vibe').textContent='Reading the vibe across your last '+RECENT.length+' finishes…';
  const cands=DATA.filter(b=>b.r).sort((a,b)=>dc(b)-dc(a)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:(b.tg||'').split(',').slice(0,8).join(','),readers:b.rd,rating:b.r}));
  const rl=RECENT.map(r=>`"${r.t}" by ${r.a}`).join('; ');
- const prompt=`My last ${RECENT.length} finished books, newest first: ${rl}. FIRST, in ONE sentence, capture the overall VIBE/mood these suggest I'm craving right now — synthesize across all of them, do NOT just list them. THEN choose 5 books from the candidate TBR list (JSON) that fit that vibe, favoring lesser-known DEEP CUTS (lower "readers") over obvious bestsellers. Return ONLY: a first line formatted "VIBE: <one sentence>", then 5 lines each formatted "ID :: one short reason it fits the vibe".`;
+ const prompt=`My last ${RECENT.length} finished books, newest first: ${rl}. Work only from the candidate TBR list (JSON), favoring lesser-known DEEP CUTS (lower "readers") over obvious bestsellers, and never repeat an ID between the two lists.\n1) In ONE sentence capture the overall VIBE/mood these suggest I'm craving right now — synthesize across all of them, do NOT just list them — then pick 5 books that fit it.\n2) In ONE sentence capture the OPPOSITE mood — something completely different from these recent reads, for when I want to flip my usual pattern (e.g. flip heavy→light, romance→other genre, dark→funny) — then pick 5 books that fit that opposite.\nReturn ONLY, in exactly this structure:\nVIBE: <one sentence>\n<5 lines, each "ID :: reason it fits the vibe">\nOPPOSITE: <one sentence>\n<5 lines, each "ID :: reason it contrasts my recent reads">`;
  try{
    const res=await window.cowork.askClaude(prompt,cands);
    let txt=(res==null)?'':(typeof res==='string'?res:(res.text||res.output||res.result||(res.content?(typeof res.content==='string'?res.content:(Array.isArray(res.content)?res.content.map(c=>c&&(c.text||c.content||'')||'').join(''):'')):'')));if(!txt)txt=String(res);
    txt=txt.replace(/```[a-z]*|```/g,'').trim();
-   let vibe=BAKED.vibe;const picks=[];
+   let vibe=BAKED.vibe, oppVibe=BAKED_OPP.vibe, sec='v'; const picks=[], opicks=[];
    txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).forEach(l=>{
-     const vm=l.match(/^vibe\s*[:\-]\s*(.+)/i); if(vm){vibe=vm[1].trim();return;}
-     const m=l.match(/(\d{2,})\s*(?:::|\||\-|:)\s*(.+)/); if(m)picks.push({id:parseInt(m[1]),reason:m[2].trim().replace(/^["'\s]+|["'\s]+$/g,'')});
+     const om=l.match(/^opposite\s*[:\-]\s*(.+)/i); if(om){oppVibe=om[1].trim();sec='o';return;}
+     const vm=l.match(/^vibe\s*[:\-]\s*(.+)/i); if(vm){vibe=vm[1].trim();sec='v';return;}
+     const m=l.match(/(\d{2,})\s*(?:::|\||\-|:)\s*(.+)/);
+     if(m){(sec==='o'?opicks:picks).push({id:parseInt(m[1]),reason:m[2].trim().replace(/^["'\s]+|["'\s]+$/g,'')});}
    });
    applyML(vibe,picks.length?picks:BAKED.picks);
- }catch(e){ applyML(BAKED.vibe,BAKED.picks); }
+   applyOpp(oppVibe,opicks.length?opicks:BAKED_OPP.picks);
+ }catch(e){ applyML(BAKED.vibe,BAKED.picks); applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks); }
 }
 async function loadCovers(){
  try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'get_list',list_id:P.list})});
@@ -255,8 +282,8 @@ function update(){
 }
 ['fAvail','fText','fHours','fRate','fSpice','fDeep','fSeries','fSort'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
 document.getElementById('sub').textContent=`${DATA.length} books · ${DATA.filter(availNow).length} available right now · snapshot ${new Date().toISOString().slice(0,10)}`;
-document.getElementById('foot').innerHTML='Deep-cut score = rating + a bonus for few readers, so hidden gems rise above bestsellers. Length = audiobook hours. Covers load live from Hardcover. The 🤖 vibe pick is synthesized across your last 5 reads — live in Cowork, or baked (refreshed weekly) on the web.';
-renderChips();applyML(BAKED.vibe,BAKED.picks);loadML();update();loadNextInSeries();loadCovers();
+document.getElementById('foot').innerHTML='Deep-cut score = rating + a bonus for few readers, so hidden gems rise above bestsellers. Length = audiobook hours. Covers load live from Hardcover. The 🤖 vibe pick is synthesized across your last 5 reads; 🔀 Something completely different is its opposite, for when you want to flip your pattern — both live in Cowork, or baked (refreshed weekly) on the web.';
+renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
