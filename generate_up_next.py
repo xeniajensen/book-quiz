@@ -159,7 +159,7 @@ const PICKS=[
  {k:'wreck',ic:'😭',lb:'Wreck me',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&has(b,'sad','angst','emotional','grief','heartbreaking','tear')),why:b=>`Emotional and a little devastating — for when you want to feel something.`},
  {k:'cozy',ic:'☕',lb:'Cozy night',pool:()=>DATA.filter(b=>availNow(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')),why:b=>`Low-stakes comfort you can start now. Pour a drink and relax.`},
  {k:'series',ic:'📚',lb:'Start a series',pool:()=>DATA.filter(b=>b.sn===1&&b.r&&b.r>=3.5),why:b=>`${b.se} #1 — kick off a new series.`},
- {k:'cont',ic:'📖',lb:'Continue a series',pool:()=>DATA.filter(b=>CONT[b.i]),why:b=>{const c=CONT[b.i];return `You rated “${c.et}” ${c.er}★ — pick up ${b.se||'the series'} where you left off (#${c.pos}).`;}},
+ {k:'cont',ic:'📖',lb:'Continue a series',pool:()=>DATA.filter(b=>CONT[b.i]),why:b=>{const c=CONT[b.i];const lead=(c.er!=null)?`You rated “${c.et}” ${c.er}★`:`You've read “${c.et}”`;return `${lead} — pick up ${b.se||'the series'} where you left off (#${c.pos}).`;}},
  {k:'deep',ic:'💎',lb:'Deep cut',pool:()=>DATA.filter(b=>b.r&&b.r>=4.0&&b.rd!=null&&b.rd<4000),why:b=>`Only ${b.rd?b.rd.toLocaleString():'a few'} readers but rated ${b.r} — a hidden gem. (This card leans obscure on purpose.)`},
  {k:'backlog',ic:'🕰️',lb:'Longest on your TBR',pool:()=>DATA.filter(b=>b.d&&b.r).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Been on your list since ${b.d}. Maybe it's finally time.`},
  {k:'spicy',ic:'🌶️',lb:'Spicy pick',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&availNow(b)),why:b=>`Spice ${b.sp}/5 and available now. Turn up the heat.`},
