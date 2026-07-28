@@ -7,6 +7,15 @@ h1{font-size:26px;margin:0 0 2px}.sub{color:#8a7f70;margin:0 0 6px;font-size:13p
 .note{color:#8a7f70;font-size:12px;margin:0 0 12px}
 .vibe{background:#fff4e2;border:1px solid #f0dcbb;border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:14px;color:#8a5a1a}
 .vibe b{color:#6e460f}
+.hero{display:flex;gap:16px;background:linear-gradient(135deg,#ffffff,#fdf3e1);border:1.5px solid #e6c98f;border-radius:16px;padding:16px 18px;margin:0 0 14px;box-shadow:0 2px 10px rgba(140,100,30,.09)}
+.hero .hcov{width:88px;height:132px;object-fit:cover;border-radius:7px;border:1px solid #e6dcc9;background:#f0e8d8;flex:none}
+.hbody{display:flex;flex-direction:column;min-width:0}
+.hlbl{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#a06a2c;margin-bottom:4px}
+.htitle{font-size:20px;font-weight:700;line-height:1.2}
+.htitle a{color:#1f2937;text-decoration:none;border-bottom:1px solid transparent}.htitle a:hover{border-bottom-color:#c9a86a}
+.hau{color:#7b7264;font-size:13px;margin:2px 0 7px}
+.hwhy{font-size:14.5px;color:#3d382f;line-height:1.5;margin-bottom:2px}
+.addbtn{font:inherit;font-size:12px;font-weight:600;padding:3px 12px;border-radius:999px;border:1px solid #16a34a;background:#16a34a;color:#fff;cursor:pointer}.addbtn:hover{background:#15803d}.addbtn:disabled{opacity:.7;cursor:default}
 h2{font-size:15px;letter-spacing:.03em;text-transform:uppercase;color:#8a6d3b;margin:24px 0 12px;border-bottom:1px solid #eadfce;padding-bottom:6px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
 .card{background:#fff;border:1px solid #ece3d5;border-radius:14px;padding:15px;box-shadow:0 1px 2px rgba(0,0,0,.03);display:flex;gap:13px}
@@ -42,6 +51,7 @@ input[type=range]{width:140px}
 </style></head><body><div class="wrap">
 <h1>Up Next — from your TBR</h1>
 <p class="sub" id="sub"></p>
+<div id="serieshero"></div>
 <div class="vibe" id="vibe">Reading your recent finishes…</div>
 <p class="note">Each card is a <b>random draw</b> from books that fit it — popular and obscure at equal odds. Only 💎 Deep cut and 🔥 Hype check deliberately lean. Hit <b>↻</b> for a fresh option.</p>
 
@@ -140,7 +150,39 @@ async function loadML(){
 async function loadCovers(){
  try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'get_list',list_id:P.list})});
    const d=await r.json();(d.books||[]).forEach(x=>{if(x.cover)COV[x.id]=x.cover;});}catch(e){}
- renderPicks();update();
+ renderPicks();update();renderHero(window._heroPick||null);
+}
+// Pinned hero: next unread book in a series you're ACTIVELY reading — i.e. one of
+// your last 3 finished books is in an unfinished series. Live via the worker; if
+// none qualify (or the worker isn't updated yet), the hero stays hidden.
+function renderHero(pick){
+ window._heroPick=pick;
+ const host=document.getElementById('serieshero'); if(!host)return;
+ if(!pick){host.innerHTML='';return;}
+ if(pick.cover)COV[pick.id]=pick.cover;
+ const onTbr=byId[pick.id];
+ const b=onTbr||{i:pick.id,t:pick.t,a:pick.a,sl:pick.sl,se:pick.series,sn:pick.snum};
+ const cov=COV[pick.id]?`<img class="hcov" src="${COV[pick.id]}" alt="" onerror="this.style.visibility='hidden'">`:`<div class="hcov"></div>`;
+ const f=pick.from||{}; const rated=(f.r!=null)?` (${f.r}★)`:''; const dt=f.date?(' on '+String(f.date).slice(0,10)):'';
+ const why=`You just finished “${f.t||'the previous book'}”${rated}${dt} — here's #${pick.snum} in ${pick.series}.`;
+ const meta=onTbr?`${rat(b)} ${srcBadge(b)} ${avBadge(b)} ${lenB(b)} ${readB(b)} `:`<span class="pill av-none">Not on your TBR yet</span> `;
+ const avail=meta+`<button class="addbtn" id="heroAdd">＋ Start reading</button>`;
+ host.innerHTML=`<div class="hero">${cov}<div class="hbody">
+   <div class="hlbl">📚 Next in a series you're reading</div>
+   <div class="htitle">${link(b)}</div>
+   <div class="hau">${b.a||pick.a||''}${pick.series?` · ${pick.series} #${pick.snum}`:''}</div>
+   <div class="hwhy">${why}</div>
+   <div class="meta">${avail}</div>
+ </div></div>`;
+ const add=document.getElementById('heroAdd');
+ if(add)add.onclick=async()=>{add.disabled=true;add.textContent='Starting…';
+   try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add_currently_reading',book_id:pick.id})});
+     const d=await r.json(); if(d&&!d.error&&!d.errors){add.textContent='✓ Currently reading';}else{add.textContent='Couldn’t update';add.disabled=false;}}
+   catch(e){add.textContent='Couldn’t update';add.disabled=false;}};
+}
+async function loadNextInSeries(){
+ try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'next_in_series'})});
+   const d=await r.json(); renderHero(d&&d.pick?d.pick:null);}catch(e){renderHero(null);}
 }
 const CHIPS=['enemies to lovers','grumpy sunshine','forced proximity','slow burn','found family','small town','fake relationship','forbidden love','second chance','dark','emotional','funny','fantasy','thriller','historical'];
 function renderChips(){const c=document.getElementById('chips');CHIPS.forEach(t=>{const s=document.createElement('span');s.className='chip';s.textContent=t;s.onclick=()=>{fText.value=t;update();};c.appendChild(s);});}
@@ -167,5 +209,5 @@ function update(){
 ['fAvail','fText','fHours','fRate','fSpice','fDeep','fSeries','fSort'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
 document.getElementById('sub').textContent=`${DATA.length} books · ${DATA.filter(availNow).length} available right now · snapshot ${new Date().toISOString().slice(0,10)}`;
 document.getElementById('foot').innerHTML='Deep-cut score = rating + a bonus for few readers, so hidden gems rise above bestsellers. Length = audiobook hours. Covers load live from Hardcover. The 🤖 vibe pick is synthesized across your last 5 reads — live in Cowork, or baked (refreshed weekly) on the web.';
-renderChips();applyML(BAKED.vibe,BAKED.picks);loadML();update();loadCovers();
+renderChips();applyML(BAKED.vibe,BAKED.picks);loadML();update();loadNextInSeries();loadCovers();
 </script></body></html>
