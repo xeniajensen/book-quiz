@@ -51,7 +51,11 @@ input[type=range]{width:140px}
 .upnextwrap{margin:0 0 18px;padding:15px 17px;border:1.5px solid #e6c98f;border-radius:16px;background:linear-gradient(135deg,#fffdf8,#fdf3e1);box-shadow:0 2px 10px rgba(140,100,30,.09)}
 .upnextwrap .unhdr{font-weight:800;color:#8a6a1e;font-size:15px;letter-spacing:.02em;margin:0 0 4px}
 .upnextwrap .unsub{font-weight:500;color:#a9946a;font-size:12.5px}
-.upnextwrap .cards{margin-top:12px}
+.upnextwrap .slider{display:flex;gap:12px;margin-top:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#e6c98f transparent}
+.upnextwrap .slider .card{flex:0 0 300px;max-width:300px;scroll-snap-align:start}
+.upnextwrap .slider::-webkit-scrollbar{height:8px}
+.upnextwrap .slider::-webkit-scrollbar-thumb{background:#e6c98f;border-radius:4px}
+.upnextwrap .slider::-webkit-scrollbar-track{background:transparent}
 </style></head><body><div class="wrap">
 <h1>Up Next — from your TBR</h1>
 <p class="sub" id="sub"></p>
@@ -181,7 +185,7 @@ function renderUpNext(list){
  list.forEach(x=>{if(x.cover)COV[x.id]=x.cover;});
  const cards=list.map(x=>{const b=byId[x.id]||{i:x.id,t:x.t,a:x.a,sl:x.hc};
    return card('⭐ Up Next',b,'You added this to your Up Next list on Hardcover.','',false);}).join('');
- host.innerHTML=`<div class="upnextwrap"><div class="unhdr">⭐ Your Up Next</div><div class="unsub">Hand-picked by you on Hardcover — pulled live every time this page loads.</div><div class="cards">${cards}</div></div>`;
+ host.innerHTML=`<div class="upnextwrap"><div class="unhdr">⭐ Your Up Next</div><div class="unsub">Hand-picked by you on Hardcover — pulled live every time this page loads. Swipe →</div><div class="slider">${cards}</div></div>`;
 }
 async function loadUpNext(){
  try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'get_list',list_id:P.upnext})});
