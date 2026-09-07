@@ -5,10 +5,11 @@ Køres automatisk af den ugentlige pipeline eller manuelt.
 
 Boglisten i Excel opdateres separat med fetch_hardcover_books.py.
 """
-import json, openpyxl, os
+import json, openpyxl, os, re
 
 EXCEL_PATH = os.path.join(os.path.dirname(__file__), 'audioboeger_tbr.xlsx')
 OUT_PATH   = os.path.join(os.path.dirname(__file__), 'næste_læsning_quiz.html')
+BUDGET_PATH = os.path.join(os.path.dirname(__file__), '.budget.json')
 
 def build_data():
     wb = openpyxl.load_workbook(EXCEL_PATH)
@@ -39,7 +40,20 @@ def build_data():
         if spice_raw and ' - ' in str(spice_raw):
             sl = str(spice_raw).split(' - ', 1)[1][:30]
 
-        src = {'BookBeat':'BB','Libby':'LB','Spotify':'SP','Lokal':'LK','Ingen':'–'}.get(source, '–')
+        src = {'BookBeat':'BB','Libby':'LB','Spotify':'SP','Lokal':'LK',
+               'Audible':'AB','Ingen':'–'}.get(source, '–')
+
+        # Libby-ventestatus fra kolonne N -> 'a' ledig / 'k' kort / 'l' lang
+        wait = ''
+        if src == 'LB':
+            n = str(ws.cell(row, 14).value or '')
+            if n.startswith('Ledig'):   wait = 'a'
+            elif n.startswith('Kort'):  wait = 'k'
+            elif n.startswith('Lang'):  wait = 'l'
+            mday = re.search(r'(\d+)\s*dage', n)
+            wait_days = int(mday.group(1)) if mday else 0
+        else:
+            wait_days = 0
 
         try: r = float(rating_raw)
         except: r = 0.0
@@ -47,6 +61,7 @@ def build_data():
         books.append({"t": title, "a": ws.cell(row,3).value or "",
                       "s": src, "g": list(all_tags),
                       "sp": sp, "r": r, "sl": sl,
+                      "w": wait, "wd": wait_days,
                       "id": ws.cell(row, 9).value or 0})
     return books
 
@@ -276,6 +291,7 @@ h1{font-size:1.6rem;font-weight:700;text-align:center;margin-bottom:6px;backgrou
       <h2>Dine anbefalinger ✨</h2>
       <p id="results-sub"></p>
     </div>
+    <button class="load-more-btn" id="freefirst-btn" style="margin:0 auto 18px;font-size:0.82rem;padding:7px 18px" onclick="toggleFreeFirst()">💳 Optimér efter mine timer: TIL</button>
     <div id="book-list"></div>
     <button class="load-more-btn" id="load-more-btn" style="display:none" onclick="loadMore()">Vis flere →</button>
     <button class="restart-btn" onclick="restart()">🔄 Prøv igen</button>
@@ -486,12 +502,57 @@ let _scoredBooks = [];
 let _shownCount = 0;
 let _rankOffset = 0;
 
-function getBadge(src) {
+function getBadge(src, w, wd) {
   if(src==='BB') return '<span class="badge badge-bb">📗 BookBeat</span>';
-  if(src==='LB') return '<span class="badge badge-lb">📘 Libby</span>';
+  if(src==='LB') {
+    const s = w==='a' ? 'ledig nu' : w==='k' ? `~${wd} dg` : w==='l' ? `~${wd} dg kø` : '';
+    return `<span class="badge badge-lb">📘 Libby${s?' · '+s:''}</span>`;
+  }
   if(src==='SP') return '<span class="badge badge-sp">🎵 Spotify</span>';
   if(src==='LK') return '<span class="badge badge-lk">💾 Lokal</span>';
+  if(src==='AB') return '<span class="badge badge-lk">🎧 Audible</span>';
   return '<span class="badge badge-none">📖 Ingen adgang</span>';
+}
+
+// ── Budget-bevidst kilde-prioritet ───────────────────────────────────────────
+// Betalte timer nulstilles hver periode: ubrugte timer = spildte penge.
+// Ejede bøger udløber aldrig, så de er bufferen — ikke førsteprioriteten.
+// urgency = timer tilbage / dage tilbage = hvor mange t/dag hun SKAL lytte
+// for ikke at spilde dem. Falder af sig selv når timerne bliver brugt.
+const BUDGET = BUDGET_DATA_PLACEHOLDER;
+function remHours(k) {
+  const o = BUDGET[k]; if(!o) return null;
+  return Math.max(0, (o.limit||0) - (o.used||0));
+}
+function urgOf(k) {
+  const o = BUDGET[k]; if(!o) return (k==='bb'?1:0.6);
+  const rem = remHours(k);
+  if(rem<=0) return -99;
+  return rem / Math.max(1, o.daysLeft||1);
+}
+let _freeFirst = true;   // "optimér efter pris/timer" til/fra
+function srcBonus(b) {
+  if(!_freeFirst) return 0;
+  const scale = 1.4;                          // vægt mod smagsmatch
+  if(b.s==='BB') return scale * Math.max(-3, Math.min(4, urgOf('bb')));
+  if(b.s==='SP') return scale * Math.max(-3, Math.min(4, urgOf('sp')));
+  if(b.s==='LB') return scale * (b.w==='a' ? 0.5 : b.w==='k' ? 0.2 : 0.05);
+  if(b.s==='LK' || b.s==='AB') return 0;      // ejet: aldrig spildt, gem som buffer
+  return -2;                                  // ingen adgang
+}
+function budgetLine() {
+  const bb=BUDGET.bb, sp=BUDGET.sp;
+  if(!bb && !sp) return '';
+  const bits=[];
+  if(bb) bits.push(`BookBeat ${bb.used||0}/${bb.limit} t${bb.daysLeft!=null?` · ${bb.daysLeft} dg tilbage`:''}`);
+  if(sp) bits.push(`Spotify ${sp.used||0}/${sp.limit} t`);
+  const ub=urgOf('bb'), us=urgOf('sp');
+  const best = ub>=us ? 'bb' : 'sp';
+  const bu = Math.max(ub, us);
+  const rec = bu<=0 ? 'alle betalte timer brugt → gratis kilder først'
+            : bu<0.5 ? 'kun lidt betalt tid tilbage → bland med Libby'
+            : `brug ${best==='bb'?'BookBeat':'Spotify'} først`;
+  return `${bits.join(' · ')} · ${rec}`;
 }
 
 function getSpice(sp,sl) {
@@ -506,22 +567,44 @@ function renderBookCard(b, rank) {
   const rankDisplay = rank < medals.length ? medals[rank] : `<span style="font-size:1rem;color:var(--muted)">#${rank+1}</span>`;
   const showTags=b.g.filter(t=>!['fiction','romance','medium-paced','fast-paced','slow-paced','m-f romance'].includes(t)).slice(0,4).map(t=>`<span class="tag-pill">${t}</span>`).join('');
   const rHTML=b.r?`<span class="star-rating">★</span> <span style="font-size:0.8rem">${b.r.toFixed(1)}</span>`:'';
+  const badgeHTML=getBadge(b.s,b.w,b.wd);
   const safeTitle=b.t.replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
   const upnextBtn=b.id?`<button class="upnext-btn" onclick="addToUpNext(this,${b.id},'${safeTitle}')">📌 Up Next</button>`:'';
-  return `<div class="book-card"><div class="book-rank">${rankDisplay}</div><div class="book-info"><div class="book-title">${b.t}</div><div class="book-author">${b.a}</div><div class="book-meta">${getBadge(b.s)}${b.sp?getSpice(b.sp,b.sl):''}${rHTML}</div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${showTags}</div>${upnextBtn?`<div style="margin-top:10px">${upnextBtn}</div>`:''}</div></div>`;
+  return `<div class="book-card"><div class="book-rank">${rankDisplay}</div><div class="book-info"><div class="book-title">${b.t}</div><div class="book-author">${b.a}</div><div class="book-meta">${badgeHTML}${b.sp?getSpice(b.sp,b.sl):''}${rHTML}</div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${showTags}</div>${upnextBtn?`<div style="margin-top:10px">${upnextBtn}</div>`:''}</div></div>`;
 }
 
 function showResults() {
   for(let i=1;i<=5;i++) document.getElementById('step'+i).style.display='none';
   document.getElementById('results').style.display='block';
 
+  resortAndRender();
+
+  document.querySelectorAll('.progress-step').forEach(el=>el.className='progress-step done');
+  document.getElementById('progress-label').textContent='Færdig! 🎉';
+}
+
+function toggleFreeFirst() {
+  _freeFirst = !_freeFirst;
+  resortAndRender();
+}
+
+function resortAndRender() {
   const onlyAvail = answers.q5==='available';
   let pool = onlyAvail ? BOOKS.filter(b=>b.s!=='–') : BOOKS;
-  _scoredBooks = pool.map(b=>({...b,score:scoreBook(b)})).sort((a,b)=>b.score-a.score||b.r-a.r);
+  _scoredBooks = pool.map(b=>({...b,score:scoreBook(b)+srcBonus(b)}))
+                     .sort((a,b)=>b.score-a.score||b.r-a.r);
   _shownCount = 0;
 
+  const tBtn = document.getElementById('freefirst-btn');
+  if(tBtn) {
+    tBtn.textContent = _freeFirst ? '💳 Optimér efter mine timer: TIL' : '💳 Optimér efter mine timer: FRA';
+    tBtn.style.opacity = _freeFirst ? '1' : '0.55';
+  }
+
+  const bl = budgetLine();
   document.getElementById('results-sub').textContent =
-    `Vurderet ud fra ${pool.length} bøger · ${onlyAvail?'Kun tilgængelige på dine platforme':'Alle bøger i din to-read liste'}`;
+    `Vurderet ud fra ${pool.length} bøger · ${onlyAvail?'Kun tilgængelige på dine platforme':'Alle bøger i din to-read liste'}`
+    + (_freeFirst && bl ? ' · ' + bl : '');
 
   if(!_scoredBooks.length){
     document.getElementById('book-list').innerHTML='<div class="no-results"><div style="font-size:2.5rem">🔍</div><p style="margin-top:12px">Ingen bøger matchede. Prøv at justere filtrene.</p></div>';
@@ -530,9 +613,6 @@ function showResults() {
 
   document.getElementById('book-list').innerHTML = '';
   appendBooks();
-
-  document.querySelectorAll('.progress-step').forEach(el=>el.className='progress-step done');
-  document.getElementById('progress-label').textContent='Færdig! 🎉';
 }
 
 function appendBooks() {
@@ -604,10 +684,26 @@ updateCounts();
 </html>
 """
 
+def load_budget():
+    """Abonnements-timer fra .budget.json (skrives af pipelinen). Dage tilbage
+    udregnes friskt, så tallet ikke bliver forældet mellem kørsler."""
+    import datetime
+    b = {}
+    if os.path.exists(BUDGET_PATH):
+        try:
+            b = json.load(open(BUDGET_PATH, encoding='utf-8'))
+            pe = (b.get('bb') or {}).get('periodEnd')
+            if pe:
+                b['bb']['daysLeft'] = max(0, (datetime.date.fromisoformat(pe) - datetime.date.today()).days)
+        except Exception:
+            b = {}
+    return b
+
 def generate():
     books = build_data()
     data_js = json.dumps(books, ensure_ascii=False, separators=(',',':'))
     html = HTML_TEMPLATE.replace('BOOKS_DATA_PLACEHOLDER', data_js)
+    html = html.replace('BUDGET_DATA_PLACEHOLDER', json.dumps(load_budget(), ensure_ascii=False))
     with open(OUT_PATH, 'w', encoding='utf-8') as f:
         f.write(html)
     print(f"Quiz genereret: {len(books)} bøger → {OUT_PATH}")
