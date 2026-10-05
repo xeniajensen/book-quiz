@@ -66,469 +66,165 @@ def build_data():
     return books
 
 # NOTE: Template uses plain { } — we use str.replace(), NOT .format()
-HTML_TEMPLATE = """\
-<!DOCTYPE html>
+HTML_TEMPLATE = r'''<!DOCTYPE html>
 <html lang="da">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📚 Hvad skal jeg læse næste?</title>
+<title>Hvad skal jeg læse næste?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:wght@500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0f1117;--card:#1a1d27;--card2:#22263a;--accent:#c084fc;--accent2:#818cf8;--gold:#fbbf24;--green:#34d399;--blue:#60a5fa;--pink:#f472b6;--orange:#fb923c;--text:#e2e8f0;--muted:#94a3b8;--border:#2d3148;}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;padding:24px 16px 60px;}
-.container{max-width:680px;margin:0 auto;}
-h1{font-size:1.6rem;font-weight:700;text-align:center;margin-bottom:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.subtitle{text-align:center;color:var(--muted);font-size:0.9rem;margin-bottom:32px;}
-.progress-wrap{display:flex;gap:8px;margin-bottom:28px;align-items:center;}
-.progress-step{flex:1;height:4px;border-radius:2px;background:var(--border);transition:background 0.3s;}
-.progress-step.done{background:var(--accent);}
-.progress-step.active{background:linear-gradient(90deg,var(--accent),var(--accent2));}
-.progress-label{color:var(--muted);font-size:0.78rem;white-space:nowrap;}
-.question-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:20px;}
-.question-emoji{font-size:2rem;margin-bottom:10px;display:block;}
-.question-title{font-size:1.15rem;font-weight:600;margin-bottom:6px;}
-.question-sub{color:var(--muted);font-size:0.85rem;margin-bottom:20px;}
-.options{display:grid;gap:10px;}
-.options.two-col{grid-template-columns:1fr 1fr;}
-.multi-hint{color:var(--muted);font-size:0.8rem;margin-bottom:12px;font-style:italic;}
-.option-btn{background:var(--card2);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;text-align:left;color:var(--text);transition:border-color 0.18s,background 0.18s;display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;line-height:1.4;width:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-@media(hover:hover){.option-btn:hover:not(.zero-match){border-color:var(--accent);background:#2a2d45;}}
-.option-btn.selected{border-color:var(--accent);background:#2e2050;color:#fff;}
-.option-btn.multi-selected{border-color:var(--accent2);background:#1e2545;color:#fff;}
-.option-btn.zero-match{opacity:0.35;cursor:not-allowed;}
-.opt-icon{font-size:1.4rem;flex-shrink:0;margin-top:1px;}
-.opt-label{font-weight:600;display:block;}
-.opt-desc{color:var(--muted);font-size:0.8rem;margin-top:2px;display:block;}
-.option-btn.selected .opt-desc,.option-btn.multi-selected .opt-desc{color:#c4b5fd;}
-.opt-count{display:inline-block;margin-left:6px;font-size:0.73rem;font-weight:700;padding:1px 7px;border-radius:20px;background:#2a2d45;color:var(--muted);vertical-align:middle;}
-.opt-count.good{background:#2e2050;color:#c4b5fd;}
-.opt-count.zero{background:#2a2020;color:#ef4444;}
-.nav-row{display:flex;gap:12px;justify-content:flex-end;margin-top:16px;}
-.btn-back{background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:10px;padding:10px 20px;cursor:pointer;font-size:0.9rem;transition:border-color 0.18s,color 0.18s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-@media(hover:hover){.btn-back:hover{border-color:var(--muted);color:var(--text);}}
-.btn-next{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:10px;padding:10px 24px;cursor:pointer;font-size:0.9rem;font-weight:600;transition:opacity 0.18s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-@media(hover:hover){.btn-next:hover{opacity:0.9;}}
-.btn-next:disabled{opacity:0.4;cursor:not-allowed;}
-#results{display:none;}
-.results-header{text-align:center;margin-bottom:24px;}
-.results-header h2{font-size:1.3rem;font-weight:700;}
-.results-header p{color:var(--muted);font-size:0.88rem;margin-top:6px;}
-.book-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:12px;display:flex;gap:16px;align-items:flex-start;}
-.book-rank{font-size:1.5rem;flex-shrink:0;width:32px;text-align:center;margin-top:2px;}
-.book-info{flex:1;min-width:0;}
-.book-title{font-weight:700;font-size:1rem;margin-bottom:2px;}
-.book-author{color:var(--muted);font-size:0.83rem;margin-bottom:8px;}
-.book-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
-.badge{padding:3px 9px;border-radius:20px;font-size:0.73rem;font-weight:600;white-space:nowrap;}
-.badge-bb{background:#1d3a2f;color:var(--green);border:1px solid #2d5a47;}
-.badge-lb{background:#1a2d4a;color:var(--blue);border:1px solid #2a4a7a;}
-.badge-sp{background:#1d2d1a;color:#4ade80;border:1px solid #2d4a27;}
-.badge-lk{background:#2a1a3a;color:#e879f9;border:1px solid #5b2d8e;}
-.badge-none{background:#2a2030;color:var(--muted);border:1px solid var(--border);}
-.spice-dots{display:flex;gap:2px;align-items:center;}
-.spice-dot{width:7px;height:7px;border-radius:50%;background:var(--border);}
-.spice-dot.lit{background:var(--orange);}
-.tag-pill{background:var(--card2);border:1px solid var(--border);padding:2px 8px;border-radius:20px;font-size:0.72rem;color:var(--muted);}
-.star-rating{color:var(--gold);font-size:0.8rem;}
-.restart-btn{display:block;margin:24px auto 0;background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:10px;padding:10px 24px;cursor:pointer;font-size:0.9rem;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-@media(hover:hover){.restart-btn:hover{border-color:var(--accent);color:var(--text);}}
-.load-more-btn{display:block;margin:16px auto 0;background:transparent;border:1.5px solid var(--accent2);color:var(--accent2);border-radius:10px;padding:10px 28px;cursor:pointer;font-size:0.9rem;font-weight:600;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color 0.18s,color 0.18s,background 0.18s;}
-@media(hover:hover){.load-more-btn:hover{background:#1e2545;border-color:var(--accent);color:var(--accent);}}
-.upnext-btn{background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:0.78rem;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color 0.18s,color 0.18s;}
-@media(hover:hover){.upnext-btn:hover{border-color:var(--accent);color:var(--accent);}}
-.upnext-btn.success{border-color:var(--green);color:var(--green);cursor:default;}
-.upnext-btn:disabled{opacity:0.6;cursor:default;}
-.no-results{text-align:center;padding:40px;color:var(--muted);}
-@media(max-width:520px){.options.two-col{grid-template-columns:1fr;}.book-card{flex-direction:column;gap:10px;}}
+:root{color-scheme:light;--paper:#f5f1e9;--card:#fff;--line:#e7dfd0;--ink:#2b2620;--ink2:#6b6257;--acc:#8a5a14;--ok:#1f7a3d;--warn:#a16207;--none:#6b6257;--serif:"Newsreader",Georgia,"Times New Roman",serif;--sans:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans)}
+.wrap{max-width:680px;margin:0 auto;padding:18px 16px 60px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 22px}
+.tabs a{padding:10px 14px;min-height:44px;display:flex;align-items:center;text-decoration:none;color:var(--ink2);font-weight:600;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a[aria-current=page]{color:var(--ink);border-bottom-color:var(--ink)}
+h1{font-family:var(--serif);font-weight:600;font-size:34px;line-height:1.1;margin:0 0 6px;letter-spacing:-.01em}
+.sub{color:var(--ink2);margin:0 0 20px;font-size:14px}
+.prog{display:flex;align-items:center;gap:12px;margin:0 0 14px}
+.bar{flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ink);width:0;transition:width .25s}
+.plabel{font-size:13px;color:var(--ink2);white-space:nowrap}
+.live{font-size:13px;color:var(--ink2);margin:0 0 6px}
+.live b{color:var(--ink)}
+.qcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.qtitle{font-family:var(--serif);font-size:25px;font-weight:600;line-height:1.2;margin:0 0 4px}
+.qtitle:focus{outline:none}
+.qsub{color:var(--ink2);font-size:14px;margin:0 0 16px}
+.opts{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.opt{display:flex;align-items:flex-start;gap:12px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;min-height:56px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;width:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+@media(hover:hover){.opt:hover:not([aria-disabled=true]){border-color:var(--ink2)}}
+.opt[aria-checked=true],.opt[aria-pressed=true]{border-color:var(--ink);background:#faf6ee}
+.opt[aria-disabled=true]{opacity:.45;cursor:not-allowed}
+.mark{flex:none;width:20px;height:20px;border:1.5px solid var(--ink2);margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;color:#fff}
+.mark.r{border-radius:50%}.mark.s{border-radius:5px}
+.opt[aria-checked=true] .mark,.opt[aria-pressed=true] .mark{background:var(--ink);border-color:var(--ink)}
+.opt[aria-checked=true] .mark::after,.opt[aria-pressed=true] .mark::after{content:"✓"}
+.oe{font-size:20px;flex:none;line-height:1.3}
+.ot{flex:1;min-width:0}
+.ol{font-weight:600;display:flex;gap:8px;align-items:baseline;justify-content:space-between}
+.od{color:var(--ink2);font-size:13px;display:block;margin-top:1px}
+.oc{font-size:12px;font-weight:600;color:var(--ink2);background:#f0e8d8;border-radius:10px;padding:1px 8px;flex:none}
+.oc.z{background:transparent;color:var(--ink2);font-weight:500}
+.foot{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.foot .sp{flex:1}
+.btn{font:inherit;font-weight:600;font-size:14px;border-radius:999px;padding:0 20px;min-height:44px;cursor:pointer;border:1.5px solid var(--ink);background:var(--ink);color:#fff;touch-action:manipulation}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+@media(hover:hover){.btn.ghost:hover{border-color:var(--ink2)}}
+.link{font:inherit;font-size:14px;background:none;border:0;color:var(--acc);font-weight:600;cursor:pointer;min-height:44px;padding:0 4px;text-decoration:underline;text-underline-offset:3px}
+.counter{font-size:13px;color:var(--ink2)}
+#results{display:none}
+.rh{font-family:var(--serif);font-size:26px;font-weight:600;margin:0 0 4px}
+.rh:focus{outline:none}
+.rsub{color:var(--ink2);font-size:13px;margin:0 0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.chip{display:inline-flex;align-items:center;gap:8px;font:inherit;font-size:13px;background:#efe7d6;border:0;border-radius:999px;padding:0 14px;min-height:44px;color:var(--ink);cursor:pointer;touch-action:manipulation}
+.chip em{font-style:normal;color:var(--ink2)}
+.chip u{color:var(--acc);font-weight:600;text-underline-offset:3px}
+.toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.tg{display:inline-flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:600;background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:0 16px;min-height:44px;color:var(--ink);cursor:pointer;touch-action:manipulation}
+.tg[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 12px;display:flex;gap:14px}
+.rank{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--ink2);width:26px;flex:none;text-align:center}
+.cb{flex:1;min-width:0}
+.bt{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.2}
+.au{color:var(--ink2);font-size:13px;margin:2px 0 6px}
+.match{font-size:14px;margin:0 0 8px}
+.match b{font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:13px;color:var(--ink2)}
+.st{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink)}
+.st::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--none)}
+.st.ok::before{background:var(--ok)}.st.warn::before{background:var(--warn)}
+.star{color:var(--acc)}
+.dots{display:inline-flex;gap:2px;align-items:center}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--acc)}
+.add{margin-top:10px;font:inherit;font-size:13px;font-weight:600;background:transparent;border:1.5px solid var(--line);border-radius:999px;min-height:44px;padding:0 16px;cursor:pointer;color:var(--ink);touch-action:manipulation}
+@media(hover:hover){.add:hover:not(:disabled){border-color:var(--ink)}}
+.add.done{border-color:var(--ok);color:var(--ok);cursor:default}
+.none{text-align:center;padding:30px 10px;color:var(--ink2)}
+.more{display:block;margin:14px auto 0}
+@media(max-width:520px){.opts{grid-template-columns:1fr}h1{font-size:28px}.card{flex-direction:column;gap:8px}.rank{text-align:left;width:auto}}
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>📚 Hvad skal jeg læse næste?</h1>
-  <p class="subtitle">Svar på 5 spørgsmål og få anbefalinger fra din to-read liste · <span id="total-count"></span> bøger</p>
-  <div class="progress-wrap">
-    <div class="progress-step active" id="ps1"></div>
-    <div class="progress-step" id="ps2"></div>
-    <div class="progress-step" id="ps3"></div>
-    <div class="progress-step" id="ps4"></div>
-    <div class="progress-step" id="ps5"></div>
-    <span class="progress-label" id="progress-label">1 / 5</span>
-  </div>
+<div class="wrap">
+  <nav class="tabs" aria-label="Sider"><a href="./" aria-current="page">Quiz</a><a href="up_next.html">Up Next</a></nav>
+  <h1>Hvad skal jeg læse næste?</h1>
+  <p class="sub">Fire spørgsmål, så får du anbefalinger fra din to-read liste · <span id="total-count"></span> bøger</p>
 
-  <div id="step1" class="question-card">
-    <span class="question-emoji">🌡️</span>
-    <div class="question-title">Hvad er din stemning lige nu?</div>
-    <div class="question-sub">Vælg den vibe du har lyst til</div>
-    <div class="options two-col" id="q1-opts">
-      <button class="option-btn" data-val="light" onclick="selectSingle(this,'q1')">
-        <span class="opt-icon">☀️</span><span><span class="opt-label">Let &amp; sjov <span class="opt-count" id="cnt-light"></span></span><span class="opt-desc">Fluffy, sjov og feel-good</span></span>
-      </button>
-      <button class="option-btn" data-val="emotional" onclick="selectSingle(this,'q1')">
-        <span class="opt-icon">💔</span><span><span class="opt-label">Dyb &amp; følelsesladet <span class="opt-count" id="cnt-emotional"></span></span><span class="opt-desc">Angst, tårer og den gode smerte</span></span>
-      </button>
-      <button class="option-btn" data-val="dark" onclick="selectSingle(this,'q1')">
-        <span class="opt-icon">🌑</span><span><span class="opt-label">Mørk &amp; intens <span class="opt-count" id="cnt-dark"></span></span><span class="opt-desc">Thriller, mystery eller dark romance</span></span>
-      </button>
-      <button class="option-btn" data-val="fantasy" onclick="selectSingle(this,'q1')">
-        <span class="opt-icon">✨</span><span><span class="opt-label">Magisk &amp; eventyrlig <span class="opt-count" id="cnt-fantasy-mood"></span></span><span class="opt-desc">Fantasy, magi eller det overnaturlige</span></span>
-      </button>
-    </div>
-    <div class="nav-row"><button class="btn-next" id="next1" disabled onclick="goNext(1)">Næste →</button></div>
-  </div>
-
-  <div id="step2" class="question-card" style="display:none">
-    <span class="question-emoji">💘</span>
-    <div class="question-title">Hvilken plot-dynamik tiltrækker dig?</div>
-    <div class="question-sub">Vælg op til 3</div>
-    <div class="multi-hint">☝️ Du kan vælge flere</div>
-    <div class="options two-col" id="q2-opts">
-      <button class="option-btn" data-val="enemies to lovers" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">⚔️</span><span><span class="opt-label">Enemies to lovers <span class="opt-count" id="cnt-etl"></span></span><span class="opt-desc">Fra had til kærlighed</span></span>
-      </button>
-      <button class="option-btn" data-val="forced proximity" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">🏠</span><span><span class="opt-label">Forced proximity <span class="opt-count" id="cnt-fp"></span></span><span class="opt-desc">Fanget sammen mod deres vilje</span></span>
-      </button>
-      <button class="option-btn" data-val="grumpy & sunshine" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">😠☀️</span><span><span class="opt-label">Grumpy &amp; sunshine <span class="opt-count" id="cnt-gs"></span></span><span class="opt-desc">Den sure og den solrige</span></span>
-      </button>
-      <button class="option-btn" data-val="slow burn" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">🕯️</span><span><span class="opt-label">Slow burn <span class="opt-count" id="cnt-sb"></span></span><span class="opt-desc">Spænding der bygger langsomt op</span></span>
-      </button>
-      <button class="option-btn" data-val="friends to lovers" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">💫</span><span><span class="opt-label">Friends to lovers <span class="opt-count" id="cnt-ftl"></span></span><span class="opt-desc">Venskab der bliver til kærlighed</span></span>
-      </button>
-      <button class="option-btn" data-val="second chances" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">🔄</span><span><span class="opt-label">Second chances <span class="opt-count" id="cnt-sc"></span></span><span class="opt-desc">Gamle flamme mødes igen</span></span>
-      </button>
-      <button class="option-btn" data-val="fake relationship" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">🎭</span><span><span class="opt-label">Fake relationship <span class="opt-count" id="cnt-fr"></span></span><span class="opt-desc">Det starter som en aftale...</span></span>
-      </button>
-      <button class="option-btn" data-val="any_trope" onclick="selectMulti(this,'q2',3)">
-        <span class="opt-icon">🎲</span><span><span class="opt-label">Overrask mig!</span><span class="opt-desc">Ingen præference</span></span>
-      </button>
-    </div>
-    <div class="nav-row">
-      <button class="btn-back" onclick="goBack(2)">← Tilbage</button>
-      <button class="btn-next" id="next2" disabled onclick="goNext(2)">Næste →</button>
-    </div>
-  </div>
-
-  <div id="step3" class="question-card" style="display:none">
-    <span class="question-emoji">🌍</span>
-    <div class="question-title">Hvilken verden vil du ind i?</div>
-    <div class="question-sub">Vælg genre/setting</div>
-    <div class="options two-col" id="q3-opts">
-      <button class="option-btn" data-val="contemporary" onclick="selectSingle(this,'q3')">
-        <span class="opt-icon">🏙️</span><span><span class="opt-label">Moderne virkelighed <span class="opt-count" id="cnt-contemp"></span></span><span class="opt-desc">Contemporary — nutidens verden</span></span>
-      </button>
-      <button class="option-btn" data-val="fantasy" onclick="selectSingle(this,'q3')">
-        <span class="opt-icon">🐉</span><span><span class="opt-label">Fantasy &amp; magi <span class="opt-count" id="cnt-fantasy-genre"></span></span><span class="opt-desc">Overnaturlig, fae, paranormal</span></span>
-      </button>
-      <button class="option-btn" data-val="historical" onclick="selectSingle(this,'q3')">
-        <span class="opt-icon">🏰</span><span><span class="opt-label">Historisk <span class="opt-count" id="cnt-hist"></span></span><span class="opt-desc">Regency, viktoriansk, fortiden</span></span>
-      </button>
-      <button class="option-btn" data-val="thriller" onclick="selectSingle(this,'q3')">
-        <span class="opt-icon">🔪</span><span><span class="opt-label">Thriller &amp; krimi <span class="opt-count" id="cnt-thriller"></span></span><span class="opt-desc">Mystery, suspense, dark</span></span>
-      </button>
-      <button class="option-btn" data-val="sports" onclick="selectSingle(this,'q3')">
-        <span class="opt-icon">🏒</span><span><span class="opt-label">Sports romance <span class="opt-count" id="cnt-sports"></span></span><span class="opt-desc">Hockey, fodbold, tennis...</span></span>
-      </button>
-      <button class="option-btn" data-val="any_genre" onclick="selectSingle(this,'q3')">
-        <span class="opt-icon">🎯</span><span><span class="opt-label">Ligegyldigt</span><span class="opt-desc">Bare noget godt</span></span>
-      </button>
-    </div>
-    <div class="nav-row">
-      <button class="btn-back" onclick="goBack(3)">← Tilbage</button>
-      <button class="btn-next" id="next3" disabled onclick="goNext(3)">Næste →</button>
-    </div>
-  </div>
-
-  <div id="step4" class="question-card" style="display:none">
-    <span class="question-emoji">🌶️</span>
-    <div class="question-title">Hvor meget spice skal der være?</div>
-    <div class="question-sub">Romance.io spice scale 1–5</div>
-    <div class="options" id="q4-opts">
-      <button class="option-btn" data-val="low" onclick="selectSingle(this,'q4')">
-        <span class="opt-icon">🌸</span><span><span class="opt-label">Kysk (1–2) <span class="opt-count" id="cnt-spice-low"></span></span><span class="opt-desc">Glimpses &amp; kisses — romantik uden eksplicit indhold</span></span>
-      </button>
-      <button class="option-btn" data-val="medium" onclick="selectSingle(this,'q4')">
-        <span class="opt-icon">🔥</span><span><span class="opt-label">Medium (3) <span class="opt-count" id="cnt-spice-med"></span></span><span class="opt-desc">Open door — der sker noget, men med smag</span></span>
-      </button>
-      <button class="option-btn" data-val="high" onclick="selectSingle(this,'q4')">
-        <span class="opt-icon">🌶️🌶️</span><span><span class="opt-label">Hedt (4–5) <span class="opt-count" id="cnt-spice-high"></span></span><span class="opt-desc">Eksplicit og rigeligt</span></span>
-      </button>
-      <button class="option-btn" data-val="any_spice" onclick="selectSingle(this,'q4')">
-        <span class="opt-icon">🎲</span><span><span class="opt-label">Ligegyldigt <span class="opt-count" id="cnt-spice-any"></span></span><span class="opt-desc">Alle spice-niveauer (inkl. bøger uden data)</span></span>
-      </button>
-    </div>
-    <div class="nav-row">
-      <button class="btn-back" onclick="goBack(4)">← Tilbage</button>
-      <button class="btn-next" id="next4" disabled onclick="goNext(4)">Næste →</button>
-    </div>
-  </div>
-
-  <div id="step5" class="question-card" style="display:none">
-    <span class="question-emoji">🎧</span>
-    <div class="question-title">Vil du lytte til den nu?</div>
-    <div class="question-sub">Filter på tilgængelighed</div>
-    <div class="options" id="q5-opts">
-      <button class="option-btn" data-val="available" onclick="selectSingle(this,'q5')">
-        <span class="opt-icon">✅</span><span><span class="opt-label">Ja — kun tilgængelige <span class="opt-count" id="cnt-avail"></span></span><span class="opt-desc">BookBeat, Libby, Spotify eller Lokal</span></span>
-      </button>
-      <button class="option-btn" data-val="all" onclick="selectSingle(this,'q5')">
-        <span class="opt-icon">📚</span><span><span class="opt-label">Vis alle <span class="opt-count" id="cnt-all"></span></span><span class="opt-desc">Inkl. bøger uden adgang endnu</span></span>
-      </button>
-    </div>
-    <div class="nav-row">
-      <button class="btn-back" onclick="goBack(5)">← Tilbage</button>
-      <button class="btn-next" id="next5" disabled onclick="showResults()">Se anbefalinger 🎉</button>
-    </div>
+  <div id="quiz">
+    <div class="prog"><div class="bar"><i id="barfill"></i></div><span class="plabel" id="plabel"></span></div>
+    <p class="live" id="live" aria-live="polite"></p>
+    <section class="qcard" id="qcard">
+      <h2 class="qtitle" id="qtitle" tabindex="-1"></h2>
+      <p class="qsub" id="qsub"></p>
+      <div class="opts" id="opts"></div>
+      <div class="foot">
+        <button class="btn ghost" id="back" type="button"></button>
+        <span class="sp"></span>
+        <span class="counter" id="counter" aria-live="polite"></span>
+        <button class="btn" id="next" type="button"></button>
+      </div>
+      <div class="foot" style="margin-top:4px"><button class="link" id="skip" type="button">Spring over</button></div>
+    </section>
   </div>
 
   <div id="results">
-    <div class="results-header">
-      <h2>Dine anbefalinger ✨</h2>
-      <p id="results-sub"></p>
+    <h2 class="rh" id="rh" tabindex="-1">Dine anbefalinger</h2>
+    <p class="rsub" id="rsub"></p>
+    <div class="chips" id="chips"></div>
+    <div class="toggles">
+      <button class="tg" id="tgAvail" type="button" aria-pressed="true">Kun dem jeg kan lytte til nu</button>
+      <button class="tg" id="tgFree" type="button" aria-pressed="true">Optimér efter mine timer</button>
     </div>
-    <button class="load-more-btn" id="freefirst-btn" style="margin:0 auto 18px;font-size:0.82rem;padding:7px 18px" onclick="toggleFreeFirst()">💳 Optimér efter mine timer: TIL</button>
     <div id="book-list"></div>
-    <button class="load-more-btn" id="load-more-btn" style="display:none" onclick="loadMore()">Vis flere →</button>
-    <button class="restart-btn" onclick="restart()">🔄 Prøv igen</button>
+    <button class="btn ghost more" id="more" type="button" style="display:none"></button>
+    <button class="btn ghost more" id="restart" type="button">Start forfra</button>
   </div>
 </div>
-
 <script>
 const BOOKS = BOOKS_DATA_PLACEHOLDER;
-
-const answers = {q1:null,q2:[],q3:null,q4:null,q5:null};
-let currentStep = 1;
-
-// ── Count helpers ─────────────────────────────────────────────────────────────
-function hasTags(book, ...tags) { return tags.some(t => book.g.includes(t)); }
-
-function moodFilter(mood) {
-  return b => {
-    if (mood === 'light')     return hasTags(b,'funny','lighthearted','hopeful');
-    if (mood === 'emotional') return hasTags(b,'emotional','angst','sad');
-    if (mood === 'dark')      return hasTags(b,'dark','tense','thriller','mystery','suspense','dark romance');
-    if (mood === 'fantasy')   return hasTags(b,'fantasy','magic','paranormal','fae','adventurous');
-    return true;
-  };
-}
-
-function tropeFilter(tropes) {
-  if (!tropes.length || tropes.includes('any_trope')) return () => true;
-  return b => tropes.some(t => b.g.includes(t));
-}
-
-function genreFilter(genre) {
-  if (!genre || genre === 'any_genre') return () => true;
-  return b => {
-    if (genre === 'contemporary') return hasTags(b,'contemporary');
-    if (genre === 'fantasy')      return hasTags(b,'fantasy','magic','paranormal','fae','high fantasy');
-    if (genre === 'historical')   return hasTags(b,'historical','regency');
-    if (genre === 'thriller')     return hasTags(b,'thriller','mystery','suspense','dark');
-    if (genre === 'sports')       return hasTags(b,'sports','hockey','football','tennis','basketball','baseball','swimming');
-    return true;
-  };
-}
-
-function spiceFilter(spice) {
-  if (!spice || spice === 'any_spice') return () => true;
-  return b => {
-    if (!b.sp) return true;  // ingen romance.io data → altid med
-    if (spice === 'low')    return b.sp >= 1 && b.sp <= 2;
-    if (spice === 'medium') return b.sp === 3;
-    if (spice === 'high')   return b.sp >= 4;
-    return true;
-  };
-}
-
-function cnt(filterFn, base) {
-  return (base || BOOKS).filter(filterFn).length;
-}
-
-function setCount(id, n) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = n;
-  el.className = 'opt-count' + (n === 0 ? ' zero' : n > 10 ? ' good' : '');
-  const btn = el.closest('.option-btn');
-  if (btn) {
-    btn.classList.toggle('zero-match', n === 0);
-    if (n === 0 && (btn.classList.contains('selected') || btn.classList.contains('multi-selected'))) {
-      btn.classList.remove('selected','multi-selected');
-    }
-  }
-}
-
-function updateCounts() {
-  document.getElementById('total-count').textContent = BOOKS.length;
-
-  // Q1 — full BOOKS
-  setCount('cnt-light',        cnt(b => hasTags(b,'funny','lighthearted','hopeful')));
-  setCount('cnt-emotional',    cnt(b => hasTags(b,'emotional','angst','sad')));
-  setCount('cnt-dark',         cnt(b => hasTags(b,'dark','tense','thriller','mystery','suspense','dark romance')));
-  setCount('cnt-fantasy-mood', cnt(b => hasTags(b,'fantasy','magic','paranormal','fae','adventurous')));
-
-  // Q2 — filtered by Q1
-  const q1pool = answers.q1 ? BOOKS.filter(moodFilter(answers.q1)) : BOOKS;
-  setCount('cnt-etl', cnt(b => b.g.includes('enemies to lovers'), q1pool));
-  setCount('cnt-fp',  cnt(b => b.g.includes('forced proximity'),  q1pool));
-  setCount('cnt-gs',  cnt(b => b.g.includes('grumpy & sunshine'), q1pool));
-  setCount('cnt-sb',  cnt(b => b.g.includes('slow burn'),         q1pool));
-  setCount('cnt-ftl', cnt(b => b.g.includes('friends to lovers'), q1pool));
-  setCount('cnt-sc',  cnt(b => b.g.includes('second chances'),    q1pool));
-  setCount('cnt-fr',  cnt(b => b.g.includes('fake relationship'),  q1pool));
-
-  // Q3 — filtered by Q1+Q2
-  const q2pool = BOOKS.filter(answers.q1 ? moodFilter(answers.q1) : ()=>true).filter(tropeFilter(answers.q2));
-  setCount('cnt-contemp',       cnt(b => hasTags(b,'contemporary'),                                     q2pool));
-  setCount('cnt-fantasy-genre', cnt(b => hasTags(b,'fantasy','magic','paranormal','fae','high fantasy'), q2pool));
-  setCount('cnt-hist',          cnt(b => hasTags(b,'historical','regency'),                             q2pool));
-  setCount('cnt-thriller',      cnt(b => hasTags(b,'thriller','mystery','suspense','dark'),              q2pool));
-  setCount('cnt-sports',        cnt(b => hasTags(b,'sports','hockey','football','tennis','basketball','baseball','swimming'), q2pool));
-
-  // Q4 — filtered by Q1+Q2+Q3
-  const q3pool = q2pool.filter(genreFilter(answers.q3));
-  setCount('cnt-spice-low',  cnt(b => b.sp >= 1 && b.sp <= 2, q3pool));
-  setCount('cnt-spice-med',  cnt(b => b.sp === 3,             q3pool));
-  setCount('cnt-spice-high', cnt(b => b.sp >= 4,              q3pool));
-  setCount('cnt-spice-any',  q3pool.length);
-
-  // Q5 — filtered by Q1+Q2+Q3+Q4
-  const q4pool = q3pool.filter(spiceFilter(answers.q4));
-  setCount('cnt-avail', cnt(b => b.s !== '–', q4pool));
-  setCount('cnt-all',   q4pool.length);
-}
-
-// ── Selection ─────────────────────────────────────────────────────────────────
-function selectSingle(btn, q) {
-  if (btn.classList.contains('zero-match')) return;
-  document.querySelectorAll('#' + q + '-opts .option-btn').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-  answers[q] = btn.dataset.val;
-  document.getElementById('next' + q.replace('q','')).disabled = false;
-  updateCounts();
-}
-
-function selectMulti(btn, q, max) {
-  if (btn.classList.contains('zero-match') && btn.dataset.val !== 'any_trope') return;
-  if (btn.dataset.val === 'any_trope') {
-    document.querySelectorAll('#' + q + '-opts .option-btn').forEach(b => b.classList.remove('multi-selected'));
-    btn.classList.add('multi-selected');
-    answers[q] = ['any_trope'];
-  } else {
-    const anyBtn = document.querySelector('#' + q + '-opts [data-val="any_trope"]');
-    if (anyBtn) anyBtn.classList.remove('multi-selected');
-    if (btn.classList.contains('multi-selected')) {
-      btn.classList.remove('multi-selected');
-      answers[q] = answers[q].filter(v => v !== btn.dataset.val);
-    } else {
-      const current = answers[q].filter(v => v !== 'any_trope');
-      if (current.length >= max) return;
-      btn.classList.add('multi-selected');
-      answers[q] = [...current, btn.dataset.val];
-    }
-  }
-  document.getElementById('next' + q.replace('q','')).disabled = answers[q].length === 0;
-  updateCounts();
-}
-
-// ── Navigation ────────────────────────────────────────────────────────────────
-function goNext(step) {
-  document.getElementById('step' + step).style.display = 'none';
-  document.getElementById('step' + (step+1)).style.display = 'block';
-  currentStep = step + 1;
-  updateProgress();
-  updateCounts();
-}
-
-function goBack(step) {
-  document.getElementById('step' + step).style.display = 'none';
-  document.getElementById('step' + (step-1)).style.display = 'block';
-  currentStep = step - 1;
-  updateProgress();
-}
-
-function updateProgress() {
-  for (let i=1;i<=5;i++) {
-    const el = document.getElementById('ps'+i);
-    el.className = 'progress-step' + (i<currentStep?' done':i===currentStep?' active':'');
-  }
-  document.getElementById('progress-label').textContent = currentStep + ' / 5';
-}
-
-// ── Scoring ───────────────────────────────────────────────────────────────────
-function scoreBook(book) {
-  let score = 0;
-  const tags = book.g;
-  const has = (...t) => t.some(tag => tags.includes(tag));
-
-  const mood = answers.q1;
-  if (mood==='light')     { if(has('funny','lighthearted'))score+=3; if(has('hopeful'))score+=1; if(has('dark','tense','angst'))score-=2; }
-  if (mood==='emotional') { if(has('emotional','angst'))score+=3; if(has('sad','hopeful'))score+=1; if(has('lighthearted','funny'))score-=1; }
-  if (mood==='dark')      { if(has('dark','tense','thriller','mystery','suspense','dark romance'))score+=3; if(has('possessive hero','alpha male'))score+=1; if(has('lighthearted','funny'))score-=2; }
-  if (mood==='fantasy')   { if(has('fantasy','magic','paranormal','fae'))score+=4; if(has('adventurous','mysterious'))score+=1; if(has('contemporary'))score-=1; }
-
-  const tropes = answers.q2;
-  if (!tropes.includes('any_trope')) {
-    tropes.forEach(t => { if(tags.includes(t)) score+=3; });
-    if(tropes.length>0 && !tropes.some(t=>tags.includes(t))) score-=1;
-  }
-
-  const genre = answers.q3;
-  if(genre==='contemporary'&& has('contemporary'))score+=3;
-  else if(genre==='fantasy'  && has('fantasy','magic','paranormal','fae','high fantasy'))score+=4;
-  else if(genre==='historical'&&has('historical','regency'))score+=4;
-  else if(genre==='thriller' && has('thriller','mystery','suspense','dark'))score+=3;
-  else if(genre==='sports'   && has('sports','hockey','football','tennis','basketball','baseball','swimming'))score+=4;
-  else if(genre && genre!=='any_genre') score-=2;
-
-  const spice = answers.q4;
-  if(spice==='low'    && book.sp>0) { score += book.sp<=2?2:book.sp>=4?-3:0; }
-  if(spice==='medium') { score += book.sp===3?2:book.sp===2||book.sp===4?1:0; }
-  if(spice==='high')   { score += book.sp>=4?2:book.sp>=3?1:book.sp>0?-1:0; }
-
-  if(book.r>=4.0) score+=1;
-  if(book.r>=4.3) score+=1;
-  return score;
-}
-
-// ── Results ───────────────────────────────────────────────────────────────────
-const PAGE_SIZE = 8;
-let _scoredBooks = [];
-let _shownCount = 0;
-let _rankOffset = 0;
-
-function getBadge(src, w, wd) {
-  if(src==='BB') return '<span class="badge badge-bb">📗 BookBeat</span>';
-  if(src==='LB') {
-    const s = w==='a' ? 'ledig nu' : w==='k' ? `~${wd} dg` : w==='l' ? `~${wd} dg kø` : '';
-    return `<span class="badge badge-lb">📘 Libby${s?' · '+s:''}</span>`;
-  }
-  if(src==='SP') return '<span class="badge badge-sp">🎵 Spotify</span>';
-  if(src==='LK') return '<span class="badge badge-lk">💾 Lokal</span>';
-  if(src==='AB') return '<span class="badge badge-lk">🎧 Audible</span>';
-  return '<span class="badge badge-none">📖 Ingen adgang</span>';
-}
-
 // ── Budget-bevidst kilde-prioritet ───────────────────────────────────────────
 // Betalte timer nulstilles hver periode: ubrugte timer = spildte penge.
 // Ejede bøger udløber aldrig, så de er bufferen — ikke førsteprioriteten.
-// urgency = timer tilbage / dage tilbage = hvor mange t/dag hun SKAL lytte
-// for ikke at spilde dem. Falder af sig selv når timerne bliver brugt.
+// Prioritering = EDF (earliest deadline first). Timerne konkurrerer om ET
+// fælles lyttetempo, så den største bunke er ikke altid den rigtige at jage:
+// udløber en mindre bunke først, dør den mens man jager den store. Kun de
+// timer hun realistisk NÅR at bruge (atRisk) tæller — resten er tabt uanset.
 const BUDGET = BUDGET_DATA_PLACEHOLDER;
+const CAP = (+BUDGET.dailyCapacity > 0) ? +BUDGET.dailyCapacity : 2.0;  // t/dag
 function remHours(k) {
   const o = BUDGET[k]; if(!o) return null;
   return Math.max(0, (o.limit||0) - (o.used||0));
 }
+// Det gamle mål: hvor mange t/dag hun SKULLE lytte for at nå det hele.
+// Bruges kun til at afgøre OM der er betalt tid i overskud.
+// Mangler daysLeft (fx uparsebar periodEnd), så antag 30 dage — en manglende
+// dato må IKKE tolkes som "udløber i morgen" og kapre hele rangeringen.
+const dl = d => (Number.isFinite(+d) && +d>=0) ? Math.max(1,+d) : 30;
+function rawUrgOf(k) {
+  const o = BUDGET[k]; if(!o) return 0;
+  const rem = remHours(k); if(rem<=0) return -99;
+  return rem / dl(o.daysLeft);
+}
+function reachableHours(k) {
+  const o = BUDGET[k]; if(!o) return 0;
+  return Math.min(remHours(k), CAP * dl(o.daysLeft));
+}
 function urgOf(k) {
   const o = BUDGET[k]; if(!o) return (k==='bb'?1:0.6);
   const rem = remHours(k);
-  if(rem<=0) return -99;
-  return rem / Math.max(1, o.daysLeft||1);
+  if(rem<=0) return -99;                      // opbrugt
+  const d = dl(o.daysLeft);
+  const atRisk = reachableHours(k);
+  if(atRisk < 1) return 0.05;                 // for lidt på spil til at styre valget
+  return (10/d) * Math.min(1, atRisk/CAP);    // EDF, dæmpet under én dags lytning
 }
 let _freeFirst = true;   // "optimér efter pris/timer" til/fra
 function srcBonus(b) {
@@ -545,144 +241,291 @@ function budgetLine() {
   if(!bb && !sp) return '';
   const bits=[];
   if(bb) bits.push(`BookBeat ${bb.used||0}/${bb.limit} t${bb.daysLeft!=null?` · ${bb.daysLeft} dg tilbage`:''}`);
-  if(sp) bits.push(`Spotify ${sp.used||0}/${sp.limit} t`);
+  if(sp) bits.push(`Spotify ${sp.used||0}/${sp.limit} t${sp.daysLeft!=null?` · ${sp.daysLeft} dg tilbage`:''}`);
   const ub=urgOf('bb'), us=urgOf('sp');
   const best = ub>=us ? 'bb' : 'sp';
   const bu = Math.max(ub, us);
+  const lvl = Math.max(rawUrgOf('bb'), rawUrgOf('sp'));   // er der overskud?
+  const bd = (BUDGET[best]||{}).daysLeft;
   const rec = bu<=0 ? 'alle betalte timer brugt → gratis kilder først'
-            : bu<0.5 ? 'kun lidt betalt tid tilbage → bland med Libby'
-            : `brug ${best==='bb'?'BookBeat':'Spotify'} først`;
+            : lvl<0.5 ? 'kun lidt betalt tid tilbage → bland med Libby'
+            : `brug ${best==='bb'?'BookBeat':'Spotify'} først${bd!=null?` (fornyes om ${bd} dg)`:''}`;
   return `${bits.join(' · ')} · ${rec}`;
 }
 
-function getSpice(sp,sl) {
-  if(!sp) return '';
-  const dots=Array.from({length:5},(_,i)=>`<span class="spice-dot${i<sp?' lit':''}"></span>`).join('');
-  const lbl=sl?` <span style="color:var(--muted);font-size:0.72rem">${sl}</span>`:'';
-  return `<span class="spice-dots">${dots}</span>${lbl}`;
+
+// ── Spørgsmål ────────────────────────────────────────────────────────────────
+const T = (b, ...tags) => tags.some(t => b.g.includes(t));
+const SPORT = ['sports','hockey','football','tennis','basketball','baseball','swimming'];
+const QS = [
+  {id:'q1', title:'Hvilken tone har du lyst til?', sub:'Kun stemningen — genren kommer bagefter.', multi:false, skip:'any', chip:'Tone', skipTxt:'alle toner',
+   opts:[
+    {v:'light', e:'☀️', l:'Let & sjov', d:'Fluffy, sjov og feel-good', f:b=>T(b,'funny','lighthearted','hopeful')},
+    {v:'emotional', e:'💔', l:'Dyb & følelsesladet', d:'Angst, tårer og den gode smerte', f:b=>T(b,'emotional','angst','sad')},
+    {v:'dark', e:'🌑', l:'Mørk & intens', d:'Spændende, dyster og anspændt', f:b=>T(b,'dark','tense','thriller','mystery','suspense','dark romance')}]},
+  {id:'q2', title:'Hvilken plot-dynamik tiltrækker dig?', sub:'Vælg op til 3.', multi:true, max:3, skip:['any_trope'], chip:'Dynamik', skipTxt:'alle dynamikker',
+   opts:[
+    {v:'enemies to lovers', e:'⚔️', l:'Enemies to lovers', d:'Fra had til kærlighed'},
+    {v:'forced proximity', e:'🏠', l:'Forced proximity', d:'Fanget sammen mod deres vilje'},
+    {v:'grumpy & sunshine', e:'☀️', l:'Grumpy & sunshine', d:'Den sure og den solrige'},
+    {v:'slow burn', e:'🕯️', l:'Slow burn', d:'Spænding der bygger langsomt op'},
+    {v:'friends to lovers', e:'💫', l:'Friends to lovers', d:'Venskab der bliver til kærlighed'},
+    {v:'second chances', e:'🔄', l:'Second chances', d:'Gamle flammer mødes igen'},
+    {v:'fake relationship', e:'🎭', l:'Fake relationship', d:'Det starter som en aftale …'}]},
+  {id:'q3', title:'Hvilken verden vil du ind i?', sub:'Genre og setting.', multi:false, skip:'any_genre', chip:'Verden', skipTxt:'alle verdener',
+   opts:[
+    {v:'contemporary', e:'🏙️', l:'Moderne virkelighed', d:'Nutidens verden', f:b=>T(b,'contemporary')},
+    {v:'fantasy', e:'🐉', l:'Fantasy & magi', d:'Overnaturlig, fae, paranormal', f:b=>T(b,'fantasy','magic','paranormal','fae','high fantasy')},
+    {v:'historical', e:'🏰', l:'Historisk', d:'Regency, viktoriansk, fortiden', f:b=>T(b,'historical','regency')},
+    {v:'thriller', e:'🔪', l:'Thriller & krimi', d:'Mystery og suspense', f:b=>T(b,'thriller','mystery','suspense','dark')},
+    {v:'sports', e:'🏒', l:'Sports romance', d:'Hockey, fodbold, tennis …', f:b=>T(b,...SPORT)}]},
+  {id:'q4', title:'Hvor meget spice skal der være?', sub:'Romance.io spice-skala 1–5. Bøger uden data tæller med.', multi:false, skip:'any_spice', chip:'Spice', skipTxt:'alle niveauer',
+   opts:[
+    {v:'low', e:'🌸', l:'Kysk (1–2)', d:'Kys og glimt — uden eksplicit indhold', f:b=>!b.sp||(b.sp>=1&&b.sp<=2)},
+    {v:'medium', e:'🔥', l:'Medium (3)', d:'Open door, men med smag', f:b=>!b.sp||b.sp===3},
+    {v:'high', e:'🌶️', l:'Hedt (4–5)', d:'Eksplicit og rigeligt', f:b=>!b.sp||b.sp>=4}]}
+];
+// q2: trope-optioner filtrerer på tagget selv
+QS[1].opts.forEach(o => o.f = b => b.g.includes(o.v));
+
+const answers = {q1:null, q2:[], q3:null, q4:null};
+let step = 0, editing = false, onlyAvail = true, freeFirst = true;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isSkip = (q, a) => q.multi ? (a.length === 1 && a[0] === q.skip[0]) : a === q.skip;
+const answered = i => { const q = QS[i], a = answers[q.id]; return q.multi ? a.length > 0 : a !== null; };
+
+// Filter for ét besvaret spørgsmål (bruges til optælling og live-antal)
+function qFilter(i) {
+  const q = QS[i], a = answers[q.id];
+  if (!answered(i) || isSkip(q, a)) return () => true;
+  if (q.multi) return b => a.some(v => b.g.includes(v));
+  const o = q.opts.find(o => o.v === a);
+  return o ? o.f : () => true;
+}
+function poolBefore(i) {
+  let p = BOOKS;
+  for (let k = 0; k < i; k++) p = p.filter(qFilter(k));
+  return p;
 }
 
-function renderBookCard(b, rank) {
-  const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
-  const rankDisplay = rank < medals.length ? medals[rank] : `<span style="font-size:1rem;color:var(--muted)">#${rank+1}</span>`;
-  const showTags=b.g.filter(t=>!['fiction','romance','medium-paced','fast-paced','slow-paced','m-f romance'].includes(t)).slice(0,4).map(t=>`<span class="tag-pill">${t}</span>`).join('');
-  const rHTML=b.r?`<span class="star-rating">★</span> <span style="font-size:0.8rem">${b.r.toFixed(1)}</span>`:'';
-  const badgeHTML=getBadge(b.s,b.w,b.wd);
-  const safeTitle=b.t.replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
-  const upnextBtn=b.id?`<button class="upnext-btn" onclick="addToUpNext(this,${b.id},'${safeTitle}')">📌 Up Next</button>`:'';
-  return `<div class="book-card"><div class="book-rank">${rankDisplay}</div><div class="book-info"><div class="book-title">${b.t}</div><div class="book-author">${b.a}</div><div class="book-meta">${badgeHTML}${b.sp?getSpice(b.sp,b.sl):''}${rHTML}</div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${showTags}</div>${upnextBtn?`<div style="margin-top:10px">${upnextBtn}</div>`:''}</div></div>`;
+// ── Rendering af spørgsmål ───────────────────────────────────────────────────
+function renderStep() {
+  const q = QS[step], a = answers[q.id], pool = poolBefore(step);
+  $('qtitle').textContent = q.title;
+  $('qsub').textContent = q.sub;
+  $('plabel').textContent = `Trin ${step + 1} af ${QS.length}`;
+  $('barfill').style.width = ((step + 1) / QS.length * 100) + '%';
+  const live = BOOKS.filter(b => QS.every((_, k) => k >= step ? true : qFilter(k)(b))).length;
+  $('live').innerHTML = `<b>${pool.length}</b> bøger matcher indtil nu`;
+  const box = $('opts');
+  box.setAttribute('role', q.multi ? 'group' : 'radiogroup');
+  box.setAttribute('aria-labelledby', 'qtitle');
+  box.innerHTML = q.opts.map(o => {
+    const n = pool.filter(o.f).length;
+    const sel = q.multi ? a.includes(o.v) : a === o.v;
+    const attr = q.multi ? `role="button" aria-pressed="${sel}"` : `role="radio" aria-checked="${sel}"`;
+    const dis = n === 0 && !sel ? ' aria-disabled="true"' : '';
+    return `<button type="button" class="opt" data-v="${esc(o.v)}" ${attr}${dis}><span class="mark ${q.multi ? 's' : 'r'}" aria-hidden="true"></span><span class="oe" aria-hidden="true">${o.e}</span><span class="ot"><span class="ol"><span>${esc(o.l)}</span><span class="oc${n === 0 ? ' z' : ''}">${n === 0 ? '0 match' : n}</span></span><span class="od">${esc(o.d)}</span></span></button>`;
+  }).join('');
+  const back = $('back'), next = $('next');
+  back.textContent = editing ? '← Til resultater' : '← Tilbage';
+  back.style.visibility = (step === 0 && !editing) ? 'hidden' : 'visible';
+  next.style.display = q.multi ? '' : 'none';
+  next.textContent = editing ? 'Se anbefalinger' : (step === QS.length - 1 ? 'Se anbefalinger' : 'Næste');
+  next.disabled = q.multi ? a.length === 0 : true;
+  $('counter').textContent = q.multi ? `${a.length} af ${q.max} valgt` : '';
+}
+
+function showStep(i, focus = true) {
+  step = i;
+  $('results').style.display = 'none';
+  $('quiz').style.display = 'block';
+  renderStep();
+  if (focus) $('qtitle').focus({preventScroll: false});
+}
+
+function advance() {
+  if (editing || step === QS.length - 1) { editing = false; showResults(); }
+  else showStep(step + 1);
+}
+
+function pick(v) {
+  const q = QS[step];
+  if (q.multi) {
+    let a = answers[q.id].filter(x => x !== q.skip[0]);
+    if (a.includes(v)) a = a.filter(x => x !== v);
+    else if (a.length < q.max) a.push(v);
+    else return;
+    answers[q.id] = a;
+    renderStep();
+    const el = document.querySelector(`#opts [data-v="${CSS.escape(v)}"]`); if (el) el.focus();
+  } else {
+    answers[q.id] = v;
+    renderStep();
+    setTimeout(advance, 260);
+  }
+}
+
+$('opts').addEventListener('click', e => {
+  const b = e.target.closest('.opt'); if (!b || b.getAttribute('aria-disabled') === 'true') return;
+  pick(b.dataset.v);
+});
+$('next').addEventListener('click', advance);
+$('skip').addEventListener('click', () => { const q = QS[step]; answers[q.id] = q.skip; advance(); });
+$('back').addEventListener('click', () => { if (editing) { editing = false; showResults(); } else if (step > 0) showStep(step - 1); });
+
+// ── Scoring ──────────────────────────────────────────────────────────────────
+function scoreBook(book) {
+  let score = 0;
+  const tags = book.g;
+  const has = (...t) => t.some(tag => tags.includes(tag));
+  const mood = answers.q1;
+  if (mood==='light')     { if(has('funny','lighthearted'))score+=3; if(has('hopeful'))score+=1; if(has('dark','tense','angst'))score-=2; }
+  if (mood==='emotional') { if(has('emotional','angst'))score+=3; if(has('sad','hopeful'))score+=1; if(has('lighthearted','funny'))score-=1; }
+  if (mood==='dark')      { if(has('dark','tense','thriller','mystery','suspense','dark romance'))score+=3; if(has('possessive hero','alpha male'))score+=1; if(has('lighthearted','funny'))score-=2; }
+  const tropes = answers.q2;
+  if (!tropes.includes('any_trope')) {
+    tropes.forEach(t => { if(tags.includes(t)) score+=3; });
+    if(tropes.length>0 && !tropes.some(t=>tags.includes(t))) score-=1;
+  }
+  const genre = answers.q3;
+  if(genre==='contemporary'&& has('contemporary'))score+=3;
+  else if(genre==='fantasy'  && has('fantasy','magic','paranormal','fae','high fantasy'))score+=4;
+  else if(genre==='historical'&&has('historical','regency'))score+=4;
+  else if(genre==='thriller' && has('thriller','mystery','suspense','dark'))score+=3;
+  else if(genre==='sports'   && has(...SPORT))score+=4;
+  else if(genre && genre!=='any_genre') score-=2;
+  const spice = answers.q4;
+  if(spice==='low'    && book.sp>0) { score += book.sp<=2?2:book.sp>=4?-3:0; }
+  if(spice==='medium') { score += book.sp===3?2:book.sp===2||book.sp===4?1:0; }
+  if(spice==='high')   { score += book.sp>=4?2:book.sp>=3?1:book.sp>0?-1:0; }
+  if(book.r>=4.0) score+=1;
+  if(book.r>=4.3) score+=1;
+  return score;
+}
+
+// "Matcher: …" — hvilke af dine svar bogen opfylder
+function matchTxt(b) {
+  const out = [];
+  QS.forEach((q, i) => {
+    const a = answers[q.id];
+    if (!answered(i) || isSkip(q, a)) return;
+    if (q.multi) a.forEach(v => { if (b.g.includes(v)) out.push(v); });
+    else { const o = q.opts.find(o => o.v === a); if (o && o.f(b) && !(q.id === 'q4' && !b.sp)) out.push(q.id === 'q4' ? `spice ${b.sp}` : o.l.toLowerCase()); }
+  });
+  return out;
+}
+
+// ── Resultater ───────────────────────────────────────────────────────────────
+const PAGE_SIZE = 8;
+let _scored = [], _shown = 0;
+const listenable = b => b.s !== '–' && !(b.s === 'LB' && b.w === 'l');
+
+function statusOf(b) {
+  if (b.s === 'LB') {
+    if (b.w === 'a') return ['ok', 'Klar nu', 'Libby'];
+    if (b.w === 'k') return ['warn', `Kø ~${b.wd} dg`, 'Libby'];
+    if (b.w === 'l') return ['warn', `Lang kø ~${b.wd} dg`, 'Libby'];
+    return ['warn', 'Kø', 'Libby'];
+  }
+  const nm = {BB:'BookBeat', SP:'Spotify', LK:'Lokal', AB:'Audible'}[b.s];
+  return nm ? ['ok', 'Klar nu', nm] : ['', 'Ingen adgang', ''];
+}
+function dots(n) { return `<span class="dots" role="img" aria-label="spice ${n} af 5">${Array.from({length:5},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span>`; }
+
+function card(b, rank) {
+  const [cls, stTxt, src] = statusOf(b);
+  const m = matchTxt(b);
+  const add = b.id ? `<button type="button" class="add" data-id="${b.id}">+ Sæt på Up Next</button>` : '';
+  return `<article class="card"><div class="rank" aria-hidden="true">${rank + 1}</div><div class="cb">
+    <div class="bt">${esc(b.t)}</div><div class="au">${esc(b.a)}</div>
+    ${m.length ? `<p class="match"><b>Matcher:</b> ${esc(m.join(', '))}</p>` : ''}
+    <div class="meta"><span class="st ${cls}">${esc(stTxt)}</span>${b.r ? `<span><span class="star">★</span> ${b.r.toFixed(2).replace(/0$/, '')}</span>` : ''}${src ? `<span>${src}</span>` : ''}${b.sp ? dots(b.sp) : ''}</div>
+    ${add}</div></article>`;
+}
+
+function chipsHTML() {
+  return QS.map((q, i) => {
+    const a = answers[q.id];
+    let t;
+    if (!answered(i) || isSkip(q, a)) t = q.skipTxt;
+    else if (q.multi) t = a.join(', ');
+    else t = q.opts.find(o => o.v === a).l;
+    return `<button type="button" class="chip" data-step="${i}" aria-label="Ret ${q.chip}: ${esc(t)}"><span><em>${q.chip}:</em> ${esc(t)}</span><u>Ret</u></button>`;
+  }).join('');
 }
 
 function showResults() {
-  for(let i=1;i<=5;i++) document.getElementById('step'+i).style.display='none';
-  document.getElementById('results').style.display='block';
-
-  resortAndRender();
-
-  document.querySelectorAll('.progress-step').forEach(el=>el.className='progress-step done');
-  document.getElementById('progress-label').textContent='Færdig! 🎉';
+  $('quiz').style.display = 'none';
+  $('results').style.display = 'block';
+  resort();
+  $('rh').focus();
 }
 
-function toggleFreeFirst() {
-  _freeFirst = !_freeFirst;
-  resortAndRender();
-}
-
-function resortAndRender() {
-  const onlyAvail = answers.q5==='available';
-  let pool = onlyAvail ? BOOKS.filter(b=>b.s!=='–') : BOOKS;
-  _scoredBooks = pool.map(b=>({...b,score:scoreBook(b)+srcBonus(b)}))
-                     .sort((a,b)=>b.score-a.score||b.r-a.r);
-  _shownCount = 0;
-
-  const tBtn = document.getElementById('freefirst-btn');
-  if(tBtn) {
-    tBtn.textContent = _freeFirst ? '💳 Optimér efter mine timer: TIL' : '💳 Optimér efter mine timer: FRA';
-    tBtn.style.opacity = _freeFirst ? '1' : '0.55';
-  }
-
+function resort() {
+  const pool = onlyAvail ? BOOKS.filter(listenable) : BOOKS;
+  _freeFirst = freeFirst;
+  _scored = pool.map(b => ({...b, score: scoreBook(b) + srcBonus(b)})).sort((a, b) => b.score - a.score || b.r - a.r);
+  _shown = 0;
+  $('chips').innerHTML = chipsHTML();
+  $('tgAvail').setAttribute('aria-pressed', onlyAvail);
+  $('tgFree').setAttribute('aria-pressed', freeFirst);
   const bl = budgetLine();
-  document.getElementById('results-sub').textContent =
-    `Vurderet ud fra ${pool.length} bøger · ${onlyAvail?'Kun tilgængelige på dine platforme':'Alle bøger i din to-read liste'}`
-    + (_freeFirst && bl ? ' · ' + bl : '');
-
-  if(!_scoredBooks.length){
-    document.getElementById('book-list').innerHTML='<div class="no-results"><div style="font-size:2.5rem">🔍</div><p style="margin-top:12px">Ingen bøger matchede. Prøv at justere filtrene.</p></div>';
+  $('rsub').textContent = `Vurderet ud fra ${pool.length} bøger` + (freeFirst && bl ? ' · ' + bl : '');
+  $('book-list').innerHTML = '';
+  if (!_scored.length) {
+    $('book-list').innerHTML = '<div class="none">Ingen bøger matcher alle svar. Prøv at slå “Kun dem jeg kan lytte til nu” fra eller ret et svar ovenfor.</div>';
+    $('more').style.display = 'none';
     return;
   }
-
-  document.getElementById('book-list').innerHTML = '';
-  appendBooks();
+  more();
 }
 
-function appendBooks() {
-  const batch = _scoredBooks.slice(_shownCount, _shownCount + PAGE_SIZE);
-  const startRank = _shownCount;
-  document.getElementById('book-list').insertAdjacentHTML('beforeend',
-    batch.map((b, i) => renderBookCard(b, startRank + i)).join('')
-  );
-  _shownCount += batch.length;
-  const btn = document.getElementById('load-more-btn');
-  if (_shownCount < _scoredBooks.length) {
-    const remaining = _scoredBooks.length - _shownCount;
-    btn.textContent = `Vis ${Math.min(PAGE_SIZE, remaining)} flere → (${remaining} tilbage)`;
-    btn.style.display = 'block';
-  } else {
-    btn.style.display = 'none';
-  }
+function more() {
+  const batch = _scored.slice(_shown, _shown + PAGE_SIZE);
+  $('book-list').insertAdjacentHTML('beforeend', batch.map((b, i) => card(b, _shown + i)).join(''));
+  _shown += batch.length;
+  const btn = $('more'), rem = _scored.length - _shown;
+  if (rem > 0) { btn.textContent = `Vis ${Math.min(PAGE_SIZE, rem)} flere (${rem} tilbage)`; btn.style.display = ''; }
+  else btn.style.display = 'none';
 }
 
-function loadMore() {
-  appendBooks();
-}
+$('more').addEventListener('click', more);
+$('tgAvail').addEventListener('click', () => { onlyAvail = !onlyAvail; resort(); });
+$('tgFree').addEventListener('click', () => { freeFirst = !freeFirst; resort(); });
+$('chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  editing = true; showStep(+c.dataset.step);
+});
+$('restart').addEventListener('click', () => {
+  answers.q1 = null; answers.q2 = []; answers.q3 = null; answers.q4 = null;
+  editing = false; showStep(0);
+  window.scrollTo(0, 0);
+});
 
-function restart() {
-  answers.q1=null;answers.q2=[];answers.q3=null;answers.q4=null;answers.q5=null;
-  currentStep=1;
-  _scoredBooks=[];_shownCount=0;
-  document.getElementById('results').style.display='none';
-  document.getElementById('load-more-btn').style.display='none';
-  document.querySelectorAll('.option-btn').forEach(b=>b.classList.remove('selected','multi-selected','zero-match'));
-  ['next1','next2','next3','next4','next5'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=true;});
-  for(let i=2;i<=5;i++) document.getElementById('step'+i).style.display='none';
-  document.getElementById('step1').style.display='block';
-  updateProgress();
-  updateCounts();
-}
-
-// ── Hardcover "Up Next" ───────────────────────────────────────────────────────
+// ── Hardcover "Up Next" ──────────────────────────────────────────────────────
 const HC_UP_NEXT_LIST = 465056;
 const HC_WORKER_URL = 'https://lucky-cloud-343c.xenia-9cc.workers.dev';
-
-async function addToUpNext(btn, bookId, title) {
-  btn.disabled = true;
-  btn.textContent = '⏳';
+$('book-list').addEventListener('click', async e => {
+  const btn = e.target.closest('.add'); if (!btn || btn.disabled || btn.classList.contains('done')) return;
+  btn.disabled = true; btn.textContent = 'Tilføjer …';
   try {
-    const r = await fetch(HC_WORKER_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({book_id: bookId, list_id: HC_UP_NEXT_LIST})
-    });
+    const r = await fetch(HC_WORKER_URL, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({book_id: +btn.dataset.id, list_id: HC_UP_NEXT_LIST})});
     const d = await r.json();
-    if (d.data?.insert_list_book?.list_book?.id) {
-      btn.textContent = '✅ Tilføjet';
-      btn.classList.add('success');
-    } else {
-      btn.textContent = '❌ Fejl';
-      btn.disabled = false;
-    }
-  } catch(e) {
-    btn.textContent = '❌ Fejl';
-    btn.disabled = false;
-  }
-}
+    if (d.data?.insert_list_book?.list_book?.id) { btn.textContent = '✓ Sat på Up Next'; btn.classList.add('done'); }
+    else { btn.textContent = 'Fejl — prøv igen'; btn.disabled = false; }
+  } catch (err) { btn.textContent = 'Fejl — prøv igen'; btn.disabled = false; }
+});
 
-// Init
-updateCounts();
+// Start
+$('total-count').textContent = BOOKS.length;
+showStep(0, false);
 </script>
 </body>
 </html>
-"""
+'''
 
 def load_budget():
     """Abonnements-timer fra .budget.json (skrives af pipelinen). Dage tilbage
