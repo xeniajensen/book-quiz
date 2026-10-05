@@ -119,6 +119,7 @@ h2{font-size:15px;letter-spacing:.03em;text-transform:uppercase;color:#8a6d3b;ma
 .star{color:#b8860b;font-weight:700}
 .cyc{margin-left:auto;font-size:12px;background:#f3ece0;border:1px solid #e2d5bf;color:#7a5c22;border-radius:8px;padding:2px 9px;cursor:pointer;flex:none}.cyc:hover{background:#ece0c9}
 .controls{background:#fff;border:1px solid #ece3d5;border-radius:14px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.srcf{min-width:0}.lbl2{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#6b6257;font-weight:600}.lbl2in{flex-direction:row!important;align-items:center;gap:4px!important}.srcrow{display:flex;gap:6px;flex-wrap:wrap}.srcbtn{border:1px solid #d9cdb8;background:#fff;color:#6b6257;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}.srcbtn.on{background:#2b2b2b;border-color:#2b2b2b;color:#fff}
 .controls label{font-size:12px;color:#6b6257;display:flex;flex-direction:column;gap:3px;font-weight:600}
 select,input[type=search]{font:inherit;padding:6px 8px;border:1px solid #d9cdb8;border-radius:8px;background:#fff}
 input[type=range]{width:140px}
@@ -160,6 +161,8 @@ input[type=range]{width:140px}
 <h2>Explore your TBR</h2>
 <div class="controls">
   <label>Availability<select id="fAvail"><option value="any">Any</option><option value="now">Available now</option><option value="soon">Now + short wait</option></select></label>
+  <div class="srcf lbl2"><span class="lbl2t">Kilde (vælg en eller flere)</span><span class="srcrow" id="fSrc"></span></div>
+  <div class="srcf lbl2"><span class="lbl2t">Brug resterende timer</span><span class="srcrow"><button type="button" class="srcbtn" id="fFit">⏳ Passer i mine timer</button><label class="lbl2in">Max <input type="number" id="fFitH" min="1" max="40" step="0.5" style="width:62px"> t</label></span></div>
   <label>Pris<select id="fCost"><option value="any">Alle kilder</option><option value="freenow">Gratis &amp; klar nu</option><option value="free">Gratis (ejet + Libby)</option><option value="nobb">Uden BookBeat</option><option value="owned">Kun ejet</option></select></label>
   <label>Search mood / trope / title<input type="search" id="fText" placeholder="e.g. enemies to lovers, dark, funny"></label>
   <label>Max hours: <span id="fhVal">any</span><input type="range" id="fHours" min="4" max="30" step="1" value="30"></label>
@@ -203,24 +206,65 @@ const costTier=b=>{
   if(b.s==='BookBeat') return 'paid';
   return 'none';
 };
+// ── Kilde-filter (gælder både pick-kortene og Explore-listen) ──────────────────
+const srcGroup=b=>(b.s==='Lokal'||b.s==='Audible')?'Ejet':b.s;
+const SRCS=['BookBeat','Spotify','Libby','Ejet','Ingen'];
+let SRCSEL=new Set(SRCS);
+try{const sv=JSON.parse(localStorage.getItem('un_src')||'null');if(Array.isArray(sv)){const f=sv.filter(x=>SRCS.includes(x));if(f.length)SRCSEL=new Set(f);}}catch(e){}
+const srcOK=b=>SRCSEL.has(srcGroup(b));
+function renderSrcFilter(){const h=document.getElementById('fSrc');if(!h)return;h.innerHTML='';
+  const all=document.createElement('button');all.type='button';all.className='srcbtn'+(SRCSEL.size===SRCS.length?' on':'');all.textContent='Alle';
+  all.onclick=()=>{SRCSEL=new Set(SRCS);saveSrc();};h.appendChild(all);
+  SRCS.forEach(k=>{const b=document.createElement('button');b.type='button';b.className='srcbtn'+(SRCSEL.has(k)&&SRCSEL.size<SRCS.length?' on':'');b.textContent=(k==='Ejet'?'Ejet (Lokal/Audible)':k);
+    b.onclick=()=>{if(SRCSEL.size===SRCS.length){SRCSEL=new Set([k]);}else if(SRCSEL.has(k)){SRCSEL.delete(k);if(!SRCSEL.size)SRCSEL=new Set(SRCS);}else{SRCSEL.add(k);}saveSrc();};h.appendChild(b);});}
+// 'Brug resterende timer': filtrer på kilde(r) + max længde = det der er tilbage på abonnementet.
+function remFor(k){const o=k==='BookBeat'?BUD.bb:(k==='Spotify'?BUD.sp:null);return o?Math.max(0,Math.round(((o.limit||0)-(o.used||0))*10)/10):null;}
+function applyFit(){
+  const h=document.getElementById('fFitH'),btn=document.getElementById('fFit');
+  if(window._fitH){window._fitH=null;btn.classList.remove('on');update();return;}   // klik igen = slå fra
+  const hv=parseFloat(h.value),only=SRCSEL.size===1?[...SRCSEL][0]:null;
+  let r=(Number.isFinite(hv)&&hv>0)?hv:(only?remFor(only):null);
+  if(r==null){h.focus();return;}
+  h.value=r;window._fitH=r;btn.classList.add('on');update();}
+function saveSrc(){const h=document.getElementById('fFitH');if(h&&SRCSEL.size===1&&!h.dataset.user){const r=remFor([...SRCSEL][0]);if(r!=null)h.value=r;}try{localStorage.setItem('un_src',JSON.stringify([...SRCSEL]));}catch(e){}renderSrcFilter();renderPicks();update();}
 const costRank={owned:0,lib:1,inc:2,paid:3,none:4};
 const costLabel={owned:'💰 Ejet',lib:'💰 Gratis (Libby)',inc:'💰 Spotify-timer',paid:'💳 BookBeat',none:''};
 const costPill=b=>{const c=costTier(b);return costLabel[c]?`<span class="badge cost-${c}">${costLabel[c]}</span>`:'';};
 // Gratis og klar til at starte nu: ejet, eller Libby-eksemplar der er ledigt.
 const freeNow=b=>costTier(b)==='owned'||(b.s==='Libby'&&b.av==='now');
+// Spotify har kun få timer tilbage: en bog der er længere end resten kan ikke nås i denne periode.
+const spLeft=()=>BUD.sp?Math.max(0,(BUD.sp.limit||0)-(BUD.sp.used||0)):null;
+const spFits=b=>{if(b.s!=='Spotify')return true;const r=spLeft();return r==null||!b.hrs||b.hrs<=r+0.25;};
 const lbDays=b=>{const m=/(\d+)\s*dage/.exec(b.lb||'');return m?+m[1]:0;};
 
 // ── Budget: brug-det-eller-mist-det ──────────────────────────────────────────
 // Betalte timer nulstilles hver periode — ubrugte timer er spildte penge.
 // Ejede boeger udloeber aldrig, saa de er bufferen, ikke foersteprioriteten.
-// urgency = timer tilbage / dage tilbage = hvor mange t/dag hun SKAL lytte
-// for ikke at spilde dem. Falder automatisk efterhaanden som hun bruger dem.
+//
+// Prioritering = EDF (earliest deadline first). Timerne konkurrerer om ET
+// faelles lyttetempo, saa den storste bunke er IKKE altid den rigtige at jage:
+// hvis en mindre bunke udloeber foerst, doer den mens man jager den store.
+// Derfor vinder den kilde der fornyes foerst — men kun for de timer hun
+// realistisk NAAR at bruge (atRisk). Timer over kapaciteten er tabt uanset
+// hvad, og skal ikke traekke valget.
 const BUD=P.budget||{};
+const CAP=(+BUD.dailyCapacity>0)?+BUD.dailyCapacity:2.0;   // t/dag hun faktisk lytter
+// raw = det gamle maal: hvor mange t/dag hun SKULLE lytte for at bruge alt.
+// Bruges stadig til at afgoere OM der er betalt tid i overskud.
+// Mangler daysLeft (fx uparsebar periodEnd), saa antag 30 dage — en manglende
+// dato skal IKKE tolkes som "udloeber i morgen" og kapre hele rangeringen.
+const dl=d=>Number.isFinite(+d)&&+d>=0?Math.max(1,+d):30;
+const rawUrg=(rem,d)=>rem<=0?-99:rem/dl(d);
+const urgCalc=(rem,d)=>{
+  if(rem<=0) return -99;                       // opbrugt
+  const dd=dl(d);
+  const atRisk=Math.min(rem,CAP*dd);           // timer der realistisk kan reddes
+  if(atRisk<1) return 0.05;                    // for lidt paa spil til at styre valget
+  return (10/dd)*Math.min(1,atRisk/CAP);       // EDF, daempet hvis under én dags lytning
+};
 const urg=src=>{
-  if(src==='BookBeat'){const b=BUD.bb;if(!b)return 1;const rem=(b.limit||0)-(b.used||0);
-    if(rem<=0)return -99; return rem/Math.max(1,b.daysLeft||1);}
-  if(src==='Spotify'){const s=BUD.sp;if(!s)return 0.6;const rem=(s.limit||0)-(s.used||0);
-    if(rem<=0)return -99; return rem/Math.max(1,s.daysLeft||1);}
+  if(src==='BookBeat'){const b=BUD.bb;if(!b)return 1;return urgCalc((b.limit||0)-(b.used||0),b.daysLeft);}
+  if(src==='Spotify'){const s=BUD.sp;if(!s)return 0.6;return urgCalc((s.limit||0)-(s.used||0),s.daysLeft);}
   return 0;
 };
 // Rangering: hoejest spild-risiko foerst. Libby-ledig faar en fast lille
@@ -228,38 +272,45 @@ const urg=src=>{
 const urgency=b=>{
   const c=costTier(b);
   if(c==='paid') return urg('BookBeat');
-  if(c==='inc')  return urg('Spotify');
+  if(c==='inc')  return spFits(b)?urg('Spotify'):-5;   // passer ikke i de resterende timer
   if(c==='lib')  return b.av==='now'?0.5:(b.av==='short'?0.2:0.05);
   if(c==='owned')return 0;
   return -50;
 };
 function budgetBanner(){
   if(!BUD.bb&&!BUD.sp) return '';
-  const parts=[]; let push=null, pushU=-1;
-  if(BUD.bb){const rem=(BUD.bb.limit||0)-(BUD.bb.used||0),d=BUD.bb.daysLeft||0,u=urg('BookBeat');
-    parts.push(`<b>BookBeat</b> ${BUD.bb.used||0} / ${BUD.bb.limit} t brugt · ${rem} t tilbage på ${d} dage${rem>0?` · ${u.toFixed(1)} t/dag for at bruge dem`:' · <b>loft nået</b>'}`);
-    if(u>pushU){pushU=u;push='BookBeat';}}
-  if(BUD.sp){const rem=(BUD.sp.limit||0)-(BUD.sp.used||0),u=urg('Spotify');
-    parts.push(`<b>Spotify</b> ${BUD.sp.used||0} / ${BUD.sp.limit} t brugt · ${rem} t tilbage${rem>0?` · ${u.toFixed(1)} t/dag`:''}`);
-    if(u>pushU){pushU=u;push='Spotify';}}
+  const parts=[]; let push=null, pushU=-1, levelU=-99, pushDays=0;
+  const line=(navn,o,srcKey)=>{
+    const rem=Math.round(((o.limit||0)-(o.used||0))*10)/10, d=dl(o.daysLeft), u=urg(srcKey);
+    const naar=Math.min(rem,CAP*d);               // hvor meget hun reelt naar
+    const spildt=Math.round((rem-naar)*10)/10;
+    parts.push(`<b>${navn}</b> ${o.used||0} / ${o.limit} t brugt · ${rem} t tilbage på ${d} dage`
+      +(rem>0?` · når ca. <b>${Math.round(naar*10)/10} t</b> i dit tempo${spildt>0.5?` (${spildt} t udløber uanset hvad)`:''}`:' · <b>loft nået</b>'));
+    if(u>pushU){pushU=u;push=navn;pushDays=d;}
+    levelU=Math.max(levelU,rawUrg(rem,d));
+  };
+  if(BUD.bb) line('BookBeat',BUD.bb,'BookBeat');
+  if(BUD.sp) line('Spotify',BUD.sp,'Spotify');
   if(BUD.bb&&BUD.bb.nextLimit&&BUD.bb.nextLimit!==BUD.bb.limit)
     parts.push(`<span style="color:#9a3412">Loftet falder til ${BUD.bb.nextLimit} t fra ${BUD.bb.periodEnd}</span>`);
-  // Samme taerskel som urgency() bruger for et ledigt Libby-laan (0.5 t/dag),
-  // saa banneret altid siger det samme som sorteringen goer.
+  // levelU (raa t/dag) afgoer OM der er betalt tid i overskud — samme 0.5-taerskel
+  // som et ledigt Libby-laan. pushU (EDF) afgoer HVILKEN kilde der naevnes.
   const rec = pushU<=0
     ? `Alle betalte timer er brugt — <b>gå efter gratis kilder</b> (ejet + Libby) resten af perioden.`
-    : pushU<0.5
+    : levelU<0.5
       ? `Kun lidt betalt tid tilbage på ${push} — <b>bland</b>: tag den med, men et ledigt Libby-lån er lige så presserende.`
-      : `Du har betalte timer i overskud — <b>brug ${push} først</b>, gem de ejede bøger til når timerne er opbrugt.`;
+      : `Du har betalte timer i overskud — <b>brug ${push} først</b>: den fornyes om ${pushDays} dage, så dens timer dør før de andres. Gem de ejede bøger til bufferen.`;
   return `<div class="budget"><div class="bhdr">💳 Dine lyttetimer</div>${parts.map(p=>`<div>${p}</div>`).join('')}<div class="brec">${rec}</div></div>`;
 }
 
 // Everyday picks: uniform-random draw from books that FIT the card (equal odds, popular or
 // obscure). Only Deep cut and Hype check deliberately lean. Light rating floors keep out duds.
 const PICKS=[
- {k:'useit',ic:'⏳',lb:'Brug dine betalte timer',pool:()=>{const best=urg('BookBeat')>=urg('Spotify')?'BookBeat':'Spotify';
-   if(urg(best)<=0)return [];
-   return DATA.filter(b=>b.s===best&&b.r&&b.r>=3.4&&startable(b));},
+ {k:'useit',ic:'⏳',lb:'Brug dine betalte timer',pool:()=>{const order=['BookBeat','Spotify'].sort((a,b)=>urg(b)-urg(a));
+   for(const best of order){if(urg(best)<=0)continue;
+     const pl=DATA.filter(b=>b.s===best&&b.r&&b.r>=3.4&&startable(b)&&spFits(b)&&srcOK(b));
+     if(pl.length)return pl;}
+   return [];},
   why:b=>{const bd=b.s==='BookBeat'?BUD.bb:BUD.sp;const rem=bd?((bd.limit||0)-(bd.used||0)):null;
    return `Du har ${rem!=null?rem+' ':''}timer tilbage på ${b.s} i denne periode — de nulstilles uanset om du bruger dem. Start her før du går til de ejede bøger.`;}},
  {k:'free',ic:'💰',lb:'Gratis lige nu',pool:()=>DATA.filter(b=>freeNow(b)&&b.r&&b.r>=3.4&&startable(b)),why:b=>b.s==='Libby'?`Ledig på Libby nu — koster dig ingenting. Lån den før køen vender tilbage.`:`Du ejer den allerede (${b.s}) — nul kroner, ingen kø, ingen abonnementstimer.`},
@@ -287,23 +338,23 @@ function renderPicks(){
  const host=document.getElementById('picks');host.innerHTML='';
  // AI vibe card first, in the same grid
  const ml=window._ml;
- if(ml&&ml.picks){const list=ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id]));
+ if(ml&&ml.picks){const list=ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));
    if(list.length){ if(window._mlIdx==null)window._mlIdx=Math.floor(Math.random()*list.length);
      const pk=list[window._mlIdx%list.length];
      const el=document.createElement('div');el.innerHTML=card('🤖 Your vibe',byId[pk.id],pk.reason||'',list.length>1?'<button class="cyc" id="mlcyc">↻</button>':'',true);host.appendChild(el.firstChild);}}
  // Anti-vibe card, right after the vibe card
  const opp=window._opp;
- if(opp&&opp.picks){const list=opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id]));
+ if(opp&&opp.picks){const list=opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));
    if(list.length){ if(window._oppIdx==null)window._oppIdx=Math.floor(Math.random()*list.length);
      const pk=list[window._oppIdx%list.length];
      const el=document.createElement('div');el.innerHTML=card('🔀 Something completely different',byId[pk.id],pk.reason||'',list.length>1?'<button class="cyc" id="oppcyc">↻</button>':'',true);host.appendChild(el.firstChild);}}
- PICKS.forEach(p=>{const pool=p.pool();if(!pool.length)return;
+ PICKS.forEach(p=>{const pool=p.pool().filter(srcOK);if(!pool.length)return;
    if(idx[p.k]==null)idx[p.k]=Math.floor(Math.random()*pool.length);
    const b=pool[Math.min(idx[p.k],pool.length-1)];
    const el=document.createElement('div');el.innerHTML=card(`${p.ic} ${p.lb}`,b,p.why(b),`<button class="cyc" data-k="${p.k}">↻</button>`,false);host.appendChild(el.firstChild);});
- const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id]));window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
- const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id]));window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
- host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool();
+ const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
+ const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
+ host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool().filter(srcOK);
    idx[p.k]=Math.floor(Math.random()*pool.length);renderPicks();});
 }
 function applyML(vibe,picks){window._ml={vibe:vibe,picks:picks};window._mlIdx=null;
@@ -407,6 +458,7 @@ function update(){
  const av=fAvail.value,cost=fCost.value,txt=fText.value.trim().toLowerCase(),maxh=+fHours.value,minr=+fRate.value,minsp=+fSpice.value,deep=fDeep.checked,seriesOnly=fSeries.checked,sort=fSort.value;
  fhVal.textContent=maxh>=30?'any':('≤'+maxh+'h');frVal.textContent=minr<=0?'any':('≥'+minr.toFixed(1));
  let rows=DATA.filter(b=>{
+   if(!srcOK(b))return false;
    if(av==='now'&&!availNow(b))return false;if(av==='soon'&&!availSoon(b))return false;
    if(cost!=='any'){const ct=costTier(b);
      if(cost==='freenow'&&!freeNow(b))return false;
@@ -414,7 +466,7 @@ function update(){
      if(cost==='nobb'&&(ct==='paid'||ct==='none'))return false;
      if(cost==='owned'&&ct!=='owned')return false;}
    if(txt){const hay=(b.t+' '+b.a+' '+(b.tg||'')+' '+(b.se||'')).toLowerCase();if(!hay.includes(txt))return false;}
-   if(maxh<30){if(!b.hrs||b.hrs>maxh)return false;} if(minr>0){if(!b.r||b.r<minr)return false;}
+   if(window._fitH&&(!b.hrs||b.hrs>window._fitH))return false;if(maxh<30){if(!b.hrs||b.hrs>maxh)return false;} if(minr>0){if(!b.r||b.r<minr)return false;}
    if(minsp>0){if(!b.sp||b.sp<minsp)return false;} if(deep){if(b.rd==null||b.rd>=8000)return false;}
    if(seriesOnly&&b.sn!==1)return false;
    if(!txt&&!startable(b))return false; // hide un-startable mid-series books unless searching by name
@@ -436,7 +488,7 @@ function update(){
 document.getElementById('sub').textContent=`${DATA.length} books · ${DATA.filter(availNow).length} available right now · snapshot ${new Date().toISOString().slice(0,10)}`;
 document.getElementById('foot').innerHTML='Deep-cut score = rating + a bonus for few readers, so hidden gems rise above bestsellers. Length = audiobook hours. Covers load live from Hardcover. The 🤖 vibe pick is synthesized across your last 5 reads; 🔀 Something completely different is its opposite, for when you want to flip your pattern — both are generated live from your latest finishes, and refresh whenever you finish a new book.';
 document.getElementById('budgetbox').innerHTML=budgetBanner();
-renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();
+renderSrcFilter();document.getElementById('fFit').onclick=applyFit;document.getElementById('fFitH').addEventListener('input',function(){this.dataset.user=1;});renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
