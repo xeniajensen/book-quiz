@@ -75,105 +75,135 @@ slim = [{"i": b["id"], "t": b["title"], "a": b["author"], "s": b["source"], "av"
          "rd": b["readers"], "tg": b["tags"], "sl": b["slug"]} for b in data]
 PAYLOAD = json.dumps({"books": slim, "recent": RECENT, "baked": BAKED, "bakedOpp": BAKED_OPP, "cont": CONT, "worker": WORKER, "list": ALL_TBR_LIST, "upnext": UP_NEXT_LIST, "budget": BUDGET}, ensure_ascii=False)
 
-HTML = r'''<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Up Next — from your TBR</title><style>
-:root{color-scheme:light}*{box-sizing:border-box}
-body{margin:0;background:#faf7f2;color:#2b2b2b;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-.wrap{max-width:1120px;margin:0 auto;padding:20px 18px 60px}
-h1{font-size:26px;margin:0 0 2px}.sub{color:#8a7f70;margin:0 0 6px;font-size:13px}
-.note{color:#8a7f70;font-size:12px;margin:0 0 12px}
-.vibe{background:#fff4e2;border:1px solid #f0dcbb;border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:14px;color:#8a5a1a}
-.vibe b{color:#6e460f}
-.hero{display:flex;gap:16px;background:linear-gradient(135deg,#ffffff,#fdf3e1);border:1.5px solid #e6c98f;border-radius:16px;padding:16px 18px;margin:0 0 14px;box-shadow:0 2px 10px rgba(140,100,30,.09)}
-.hero .hcov{width:88px;height:132px;object-fit:cover;border-radius:7px;border:1px solid #e6dcc9;background:#f0e8d8;flex:none}
-.hbody{display:flex;flex-direction:column;min-width:0}
-.hlbl{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#a06a2c;margin-bottom:4px}
-.htitle{font-size:20px;font-weight:700;line-height:1.2}
-.htitle a{color:#1f2937;text-decoration:none;border-bottom:1px solid transparent}.htitle a:hover{border-bottom-color:#c9a86a}
-.hau{color:#7b7264;font-size:13px;margin:2px 0 7px}
-.hwhy{font-size:14.5px;color:#3d382f;line-height:1.5;margin-bottom:2px}
-.addbtn{font:inherit;font-size:12px;font-weight:600;padding:3px 12px;border-radius:999px;border:1px solid #16a34a;background:#16a34a;color:#fff;cursor:pointer}.addbtn:hover{background:#15803d}.addbtn:disabled{opacity:.7;cursor:default}
-h2{font-size:15px;letter-spacing:.03em;text-transform:uppercase;color:#8a6d3b;margin:24px 0 12px;border-bottom:1px solid #eadfce;padding-bottom:6px}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
-.card{background:#fff;border:1px solid #ece3d5;border-radius:14px;padding:15px;box-shadow:0 1px 2px rgba(0,0,0,.03);display:flex;gap:13px}
-.card.ai{border-color:#e6c98f;background:#fffdf8}
+HTML = r'''<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Up Next — from your TBR</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet"><style>
+:root{color-scheme:light;--paper:#f5f1e9;--card:#fff;--line:#e7dfd0;--ink:#2b2620;--ink2:#6b6257;--acc:#8a5a14;--ok:#1f7a3d;--warn:#a16207;--none:#6b6257;--serif:"Newsreader",Georgia,"Times New Roman",serif;--sans:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans)}
+.wrap{max-width:1120px;margin:0 auto;padding:24px 18px 60px}
+h1{font-family:var(--serif);font-weight:600;font-size:36px;line-height:1.1;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-family:var(--serif);font-weight:600;font-size:24px;line-height:1.2;margin:34px 0 4px;color:var(--ink)}
+.h2sub{color:var(--ink2);font-size:13px;margin:0 0 14px}
+.sub{color:var(--ink2);margin:0 0 10px;font-size:13px}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.status{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;color:var(--ink2);font-size:13px;margin:0 0 18px}
+.status b{color:var(--ink);font-weight:600}
+.status details{display:inline}.status summary{cursor:pointer;color:var(--acc);font-weight:600}
+.budget{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0 0;font-size:13px;line-height:1.65;color:var(--ink);flex-basis:100%}
+.budget .bhdr{font-weight:700;margin-bottom:4px}
+.budget .brec{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);color:var(--ink2)}
+/* hero: eneste tonede flade */
+.hero{display:flex;gap:18px;background:#fbf0dc;border:1px solid #ecd9ae;border-radius:16px;padding:18px 20px;margin:0 0 22px}
+.hero .hcov,.hero .hph{width:104px;height:156px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#f0e8d8;flex:none}
+.hbody{display:flex;flex-direction:column;min-width:0;flex:1}
+.hlbl,.lbl{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc)}
+.lbl .note{font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink2)}
+.htitle{font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.2;margin-top:4px}
+.htitle a{text-decoration:none}.htitle a:hover{text-decoration:underline}
+.hau{color:var(--ink2);font-size:13px;margin:2px 0 8px}
+.hwhy{font-size:15px;color:var(--ink);line-height:1.5}
+/* kort: flade, hvide */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;gap:14px}
 .card .body{display:flex;flex-direction:column;flex:1;min-width:0}
-.cov{width:74px;height:111px;object-fit:cover;border-radius:6px;border:1px solid #e6dcc9;background:#f0e8d8;flex:none}
-.cov.blank{visibility:hidden}
-.lblrow{display:flex;align-items:center;gap:8px;margin-bottom:3px}
-.lbl{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#a06a2c}
-.bt{font-size:17px;font-weight:700;line-height:1.2}
-.bt a{color:#1f2937;text-decoration:none;border-bottom:1px solid transparent}.bt a:hover{border-bottom-color:#c9a86a}
-.au{color:#7b7264;font-size:12.5px;margin-bottom:6px}
-.why{font-size:14px;color:#3d382f;line-height:1.5}
-.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px}
-.badge{font-size:10.5px;padding:2px 7px;border-radius:5px;background:#f3efe7;color:#7d746353}
-.badge{color:#7a7060}
-.src-Audible{background:#fce4d6;color:#9a3412}.src-BookBeat{background:#dbeafe;color:#1e40af}.src-Libby{background:#dcfce7;color:#166534}.src-Spotify{background:#ecfccb;color:#3f6212}.src-Lokal{background:#ede9fe;color:#5b21b6}.src-Ingen{background:#f1f1f1;color:#777}
-.pill{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;color:#fff}
-.av-now{background:#16a34a}.av-short{background:#ca8a04}.av-long{background:#b45309}.av-none{background:#9ca3af}
-.cost-owned{background:#dcfce7;color:#14532d}.cost-lib{background:#d1fae5;color:#065f46}.cost-inc{background:#fef9c3;color:#713f12}.cost-paid{background:#fee2e2;color:#991b1b}
-.budget{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin:0 0 18px;font-size:13px;line-height:1.65;color:#5c4a1a}
-.budget .bhdr{font-weight:800;font-size:13.5px;color:#8a6a1e;margin-bottom:5px}
-.budget .brec{margin-top:7px;padding-top:7px;border-top:1px dashed #fde68a}
-.star{color:#b8860b;font-weight:700}
-.cyc{margin-left:auto;font-size:12px;background:#f3ece0;border:1px solid #e2d5bf;color:#7a5c22;border-radius:8px;padding:2px 9px;cursor:pointer;flex:none}.cyc:hover{background:#ece0c9}
-.controls{background:#fff;border:1px solid #ece3d5;border-radius:14px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
-.srcf{min-width:0}.lbl2{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#6b6257;font-weight:600}.lbl2in{flex-direction:row!important;align-items:center;gap:4px!important}.srcrow{display:flex;gap:6px;flex-wrap:wrap}.srcbtn{border:1px solid #d9cdb8;background:#fff;color:#6b6257;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}.srcbtn.on{background:#2b2b2b;border-color:#2b2b2b;color:#fff}
-.controls label{font-size:12px;color:#6b6257;display:flex;flex-direction:column;gap:3px;font-weight:600}
-select,input[type=search]{font:inherit;padding:6px 8px;border:1px solid #d9cdb8;border-radius:8px;background:#fff}
-input[type=range]{width:140px}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.chip{font-size:12px;padding:4px 11px;border-radius:999px;background:#f1e8d8;border:1px solid #e2d5bf;color:#6b5320;cursor:pointer}.chip:hover{background:#e7d9bf}
-.rowcount{color:#8a7f70;font-size:13px;margin:10px 0}
-.row{display:flex;gap:11px;padding:11px 4px;border-bottom:1px solid #f0e8da;align-items:center}
-.row .rcov{width:42px;height:63px;object-fit:cover;border-radius:4px;border:1px solid #e6dcc9;background:#f0e8d8;flex:none}.row .rcov.blank{visibility:hidden}
-.row .ti{font-weight:600}.row .ti a{color:#1f2937;text-decoration:none}.row .ti a:hover{text-decoration:underline}
-.row .ra{color:#7b7264;font-size:13px}.tagline{color:#9a8f7d;font-size:11.5px;margin-top:2px}
-.row .rrank{color:#b8a988;font-size:12px;min-width:22px;flex:none}
+.cov,.ph{width:74px;height:111px;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:#f0e8d8;flex:none}
+.ph{display:flex;align-items:flex-end;padding:6px;font-family:var(--serif);font-size:12px;line-height:1.15;font-weight:600;color:#4a3f2c;overflow:hidden}
+.hero .hph{font-size:14px;padding:9px}
+.row .rcov,.row .rph{width:42px;height:63px;border-radius:4px;border:1px solid var(--line);flex:none}
+.row .rph{display:block;padding:0;font-size:0}
+.lblrow{margin-bottom:3px}
+.bt{font-family:var(--serif);font-size:18px;font-weight:600;line-height:1.2}
+.bt a{text-decoration:none}.bt a:hover{text-decoration:underline}
+.au{color:var(--ink2);font-size:13px;margin-bottom:6px}
+.why{font-size:14px;color:var(--ink);line-height:1.5}
+.meta{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-top:9px;font-size:13px;color:var(--ink2)}
+.star{color:var(--ink);font-weight:600}
+.st{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink)}
+.st i{width:8px;height:8px;border-radius:50%;background:var(--none);display:inline-block}
+.st-now i{background:var(--ok)}.st-short i{background:var(--warn)}.st-long i{background:var(--none);opacity:.55}.st-none i{background:transparent;border:1.5px solid var(--none)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:12px}
+.btn{font:inherit;font-size:14px;font-weight:600;min-height:36px;padding:6px 16px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+.btn:hover{background:#000}.btn:disabled{opacity:.65;cursor:default}
+.btn.ghost{background:transparent;color:var(--ink);border-color:#cfc4ae}.btn.ghost:hover{background:#efe8d9}
+/* filtre */
+.controls{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.searchrow{display:flex;gap:10px;align-items:center}
+input[type=search],select,input[type=number]{font:inherit;padding:8px 10px;border:1px solid #cfc4ae;border-radius:10px;background:#fff;color:var(--ink)}
+input[type=search]{flex:1;min-width:0}
+.quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.tg{font:inherit;font-size:13px;font-weight:600;min-height:34px;border:1px solid #cfc4ae;background:#fff;color:var(--ink2);border-radius:999px;padding:5px 13px;cursor:pointer}
+.tg[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+details.more{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+details.more>summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--acc)}
+.grp{margin-top:14px}.grp h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);margin:0 0 6px;font-weight:700}
+.grp .row2{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grp .hint{font-size:12px;color:var(--ink2);margin-top:6px}
+input[type=range]{width:200px;accent-color:var(--ink)}
+.rad{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.rad label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.active{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.achip{display:inline-flex;gap:6px;align-items:center;background:#efe8d9;border-radius:999px;padding:3px 6px 3px 12px;font-size:13px}
+.achip button{font:inherit;border:0;background:none;cursor:pointer;color:var(--ink2);min-width:24px;min-height:24px;font-size:15px;line-height:1}
+.linkbtn{font:inherit;font-size:13px;font-weight:600;border:0;background:none;color:var(--acc);cursor:pointer;padding:4px}
+.rowcount{color:var(--ink2);font-size:13px;margin:14px 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}.chip{font-size:12px;padding:4px 11px;border-radius:999px;background:transparent;border:1px solid #d9cdb8;color:var(--ink2);cursor:pointer}.chip:hover{background:#efe8d9}
+.row{display:flex;gap:11px;padding:11px 4px;border-bottom:1px solid var(--line);align-items:center}
+.row .rcov{object-fit:cover;background:#f0e8d8}.row .rcov.blank{visibility:hidden}
+.row .ti{font-weight:600;overflow-wrap:anywhere}.row .ti a{text-decoration:none}.row .ti a:hover{text-decoration:underline}
+.row .ra{color:var(--ink2);font-size:13px;font-weight:400}.tagline{color:var(--ink2);font-size:12px;margin-top:2px}
+.row .rrank{color:var(--ink2);font-size:12px;min-width:22px;flex:none}
 .row .rmid{flex:1;min-width:0}
-.row .ti{overflow-wrap:anywhere}
-.row .rmeta{text-align:right;white-space:nowrap;flex:none}
+.row .rmeta{text-align:right;flex:none;display:flex;flex-direction:column;gap:2px;align-items:flex-end;font-size:13px;color:var(--ink2)}
+.foot{margin-top:34px;color:var(--ink2);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+/* Din Up Next + serie-række */
+.upnextwrap{margin:0 0 6px}
+.unhead{display:flex;align-items:flex-end;gap:10px}
+.unhead .arrows{margin-left:auto;display:flex;gap:6px}
+.arrow{font:inherit;width:36px;height:36px;border-radius:50%;border:1px solid #cfc4ae;background:#fff;cursor:pointer;font-size:16px;color:var(--ink)}
+.arrow:hover{background:#efe8d9}
+.slider{display:flex;gap:12px;margin-top:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#cfc4ae transparent}
+.slider .card{flex:0 0 min(300px,82%);max-width:300px;scroll-snap-align:start}
 @media (max-width:560px){
+ h1{font-size:28px}h2{font-size:21px}
+ .hero{flex-direction:column;gap:12px}.hero .hcov,.hero .hph{width:88px;height:132px}
+ .btn,.tg,.arrow{min-height:44px}.tg{padding:8px 14px}.achip button{min-width:32px;min-height:32px}
+ .searchrow input{min-height:44px}
  .row{flex-wrap:wrap;align-items:flex-start}
- .row .rmeta{flex-basis:100%;white-space:normal;text-align:left;margin-top:7px;padding-left:53px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
- .row .rmeta br{display:none}
+ .row .rmeta{flex-basis:100%;flex-direction:row;flex-wrap:wrap;gap:4px 12px;align-items:center;text-align:left;margin-top:6px;padding-left:53px}
+ input[type=range]{width:100%}
 }
-.foot{margin-top:34px;color:#9a8f7d;font-size:12px;border-top:1px solid #eadfce;padding-top:12px}
-.upnextwrap{margin:0 0 18px;padding:15px 17px;border:1.5px solid #e6c98f;border-radius:16px;background:linear-gradient(135deg,#fffdf8,#fdf3e1);box-shadow:0 2px 10px rgba(140,100,30,.09)}
-.upnextwrap .unhdr{font-weight:800;color:#8a6a1e;font-size:15px;letter-spacing:.02em;margin:0 0 4px}
-.upnextwrap .unsub{font-weight:500;color:#a9946a;font-size:12.5px}
-.upnextwrap .slider{display:flex;gap:12px;margin-top:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#e6c98f transparent}
-.upnextwrap .slider .card{flex:0 0 300px;max-width:300px;scroll-snap-align:start}
-.upnextwrap .slider::-webkit-scrollbar{height:8px}
-.upnextwrap .slider::-webkit-scrollbar-thumb{background:#e6c98f;border-radius:4px}
-.upnextwrap .slider::-webkit-scrollbar-track{background:transparent}
 </style></head><body><div class="wrap">
-<h1>Up Next — from your TBR</h1>
+<h1>Up Next</h1>
 <p class="sub" id="sub"></p>
-<div id="upnext"></div>
+<div class="status" id="statusline"><span>Seneste læsninger: <b id="vibe">Læser dine seneste bøger…</b></span><span id="hoursline"></span><div id="budgetbox" style="flex-basis:100%"></div></div>
 <div id="serieshero"></div>
-<div class="vibe" id="vibe">Reading your recent finishes…</div>
-<p class="note">Each card is a <b>random draw</b> from books that fit it — popular and obscure at equal odds. Only 💎 Deep cut and 🔥 Hype check deliberately lean. Hit <b>↻</b> for a fresh option.</p>
+<div id="upnext"></div>
 
-<div id="budgetbox"></div>
+<h2>Andre forslag</h2>
+<p class="h2sub">Tilfældigt trukket blandt bøger, der passer til hvert kort.</p>
 <div class="cards" id="picks"></div>
 
-<h2>Explore your TBR</h2>
+<h2>Udforsk din TBR</h2>
 <div class="controls">
-  <label>Availability<select id="fAvail"><option value="any">Any</option><option value="now">Available now</option><option value="soon">Now + short wait</option></select></label>
-  <div class="srcf lbl2"><span class="lbl2t">Kilde (vælg en eller flere)</span><span class="srcrow" id="fSrc"></span></div>
-  <div class="srcf lbl2"><span class="lbl2t">Brug resterende timer</span><span class="srcrow"><button type="button" class="srcbtn" id="fFit">⏳ Passer i mine timer</button><label class="lbl2in">Max <input type="number" id="fFitH" min="1" max="40" step="0.5" style="width:62px"> t</label></span></div>
-  <label>Pris<select id="fCost"><option value="any">Alle kilder</option><option value="freenow">Gratis &amp; klar nu</option><option value="free">Gratis (ejet + Libby)</option><option value="nobb">Uden BookBeat</option><option value="owned">Kun ejet</option></select></label>
-  <label>Search mood / trope / title<input type="search" id="fText" placeholder="e.g. enemies to lovers, dark, funny"></label>
-  <label>Max hours: <span id="fhVal">any</span><input type="range" id="fHours" min="4" max="30" step="1" value="30"></label>
-  <label>Min rating: <span id="frVal">any</span><input type="range" id="fRate" min="0" max="4.6" step="0.1" value="0"></label>
-  <label>Min spice<select id="fSpice"><option value="0">any</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-  <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="fDeep"> Deep cuts only</label>
-  <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="fSeries"> Series openers only</label>
-  <label>Sort<select id="fSort"><option value="useit">Brug mine timer</option><option value="cheap">Billigst først</option><option value="deep">Deep-cut score</option><option value="rating">Rating</option><option value="hours">Shortest</option><option value="added">Longest on TBR</option><option value="rand">Random</option></select></label>
+  <div class="searchrow"><input type="search" id="fText" aria-label="Søg" placeholder="Søg stemning, trope eller titel — fx enemies to lovers, mørk, sjov"></div>
+  <div class="quick" role="group" aria-label="Hurtigfiltre">
+    <button type="button" class="tg" id="qNow" aria-pressed="false">Klar nu</button>
+    <button type="button" class="tg" id="qFree" aria-pressed="false">Gratis</button>
+    <button type="button" class="tg" id="qFit" aria-pressed="false">Passer i mine timer</button>
+    <button type="button" class="tg" id="qDeep" aria-pressed="false">Deep cuts</button>
+    <button type="button" class="tg" id="qSeries" aria-pressed="false">Serie-starter</button>
+  </div>
+  <details class="more" id="moreBox"><summary>Flere filtre</summary>
+    <div class="grp"><h3>Adgang</h3><div class="row2" id="fSrc" role="group" aria-label="Kilde"></div><div class="hint">Vælg en eller flere kilder. "Gratis" = ejet eller Libby.</div></div>
+    <div class="grp"><h3>Længde</h3><div class="row2"><label for="fHours">Max timer: <b id="fhVal">alle</b></label><input type="range" id="fHours" min="4" max="30" step="1" value="30"></div><div class="hint" id="fitHint"></div></div>
+    <div class="grp"><h3>Bedømmelse</h3><div class="row2" id="fRate" role="group" aria-label="Min. bedømmelse"></div></div>
+    <div class="grp"><h3>Spice</h3><div class="row2" id="fSpice" role="group" aria-label="Min. spice"></div></div>
+    <div class="grp"><h3>Sortering</h3><div class="rad" id="fSort"></div></div>
+    <div class="grp"><h3>Forslag til søgning</h3><div class="chips" id="chips"></div></div>
+  </details>
+  <div class="active" id="active"></div>
 </div>
-<div class="chips" id="chips"></div>
-<div class="rowcount" id="rc"></div>
+<div class="rowcount" id="rc" aria-live="polite"></div>
 <div id="results"></div>
 <div class="foot" id="foot"></div>
 </div>
@@ -206,27 +236,24 @@ const costTier=b=>{
   if(b.s==='BookBeat') return 'paid';
   return 'none';
 };
-// ── Kilde-filter (gælder både pick-kortene og Explore-listen) ──────────────────
+// ── Kilde-filter, hurtigfiltre og timer ───────────────────────────────────────
 const srcGroup=b=>(b.s==='Lokal'||b.s==='Audible')?'Ejet':b.s;
 const SRCS=['BookBeat','Spotify','Libby','Ejet','Ingen'];
 let SRCSEL=new Set(SRCS);
 try{const sv=JSON.parse(localStorage.getItem('un_src')||'null');if(Array.isArray(sv)){const f=sv.filter(x=>SRCS.includes(x));if(f.length)SRCSEL=new Set(f);}}catch(e){}
 const srcOK=b=>SRCSEL.has(srcGroup(b));
-function renderSrcFilter(){const h=document.getElementById('fSrc');if(!h)return;h.innerHTML='';
-  const all=document.createElement('button');all.type='button';all.className='srcbtn'+(SRCSEL.size===SRCS.length?' on':'');all.textContent='Alle';
-  all.onclick=()=>{SRCSEL=new Set(SRCS);saveSrc();};h.appendChild(all);
-  SRCS.forEach(k=>{const b=document.createElement('button');b.type='button';b.className='srcbtn'+(SRCSEL.has(k)&&SRCSEL.size<SRCS.length?' on':'');b.textContent=(k==='Ejet'?'Ejet (Lokal/Audible)':k);
-    b.onclick=()=>{if(SRCSEL.size===SRCS.length){SRCSEL=new Set([k]);}else if(SRCSEL.has(k)){SRCSEL.delete(k);if(!SRCSEL.size)SRCSEL=new Set(SRCS);}else{SRCSEL.add(k);}saveSrc();};h.appendChild(b);});}
-// 'Brug resterende timer': filtrer på kilde(r) + max længde = det der er tilbage på abonnementet.
+const F={now:false,free:false,fit:false,deep:false,series:false,rate:0,spice:0,maxh:30,sort:'useit',txt:''};
+const fmt=n=>String(Math.round(n*10)/10).replace('.',',');
 function remFor(k){const o=k==='BookBeat'?BUD.bb:(k==='Spotify'?BUD.sp:null);return o?Math.max(0,Math.round(((o.limit||0)-(o.used||0))*10)/10):null;}
-function applyFit(){
-  const h=document.getElementById('fFitH'),btn=document.getElementById('fFit');
-  if(window._fitH){window._fitH=null;btn.classList.remove('on');update();return;}   // klik igen = slå fra
-  const hv=parseFloat(h.value),only=SRCSEL.size===1?[...SRCSEL][0]:null;
-  let r=(Number.isFinite(hv)&&hv>0)?hv:(only?remFor(only):null);
-  if(r==null){h.focus();return;}
-  h.value=r;window._fitH=r;btn.classList.add('on');update();}
-function saveSrc(){const h=document.getElementById('fFitH');if(h&&SRCSEL.size===1&&!h.dataset.user){const r=remFor([...SRCSEL][0]);if(r!=null)h.value=r;}try{localStorage.setItem('un_src',JSON.stringify([...SRCSEL]));}catch(e){}renderSrcFilter();renderPicks();update();}
+// Passer i mine timer: BookBeat/Spotify-bøger må ikke være længere end timerne tilbage på netop den kilde.
+// Ejede bøger og Libby er ikke begrænset af et timebudget.
+const fitsOwn=b=>{const r=(b.s==='BookBeat'||b.s==='Spotify')?remFor(b.s):null;return r==null||!b.hrs||b.hrs<=r+0.25;};
+function mkTg(label,pressed,fn){const x=document.createElement('button');x.type='button';x.className='tg';x.setAttribute('aria-pressed',pressed?'true':'false');x.textContent=label;x.onclick=fn;return x;}
+function renderSrcFilter(){const h=document.getElementById('fSrc');if(!h)return;h.innerHTML='';const all=SRCSEL.size===SRCS.length;
+  h.appendChild(mkTg('Alle',all,()=>{SRCSEL=new Set(SRCS);saveSrc();}));
+  SRCS.forEach(k=>{h.appendChild(mkTg(k==='Ejet'?'Ejet (Lokal/Audible)':k,!all&&SRCSEL.has(k),()=>{
+    if(SRCSEL.size===SRCS.length){SRCSEL=new Set([k]);}else if(SRCSEL.has(k)){SRCSEL.delete(k);if(!SRCSEL.size)SRCSEL=new Set(SRCS);}else{SRCSEL.add(k);}saveSrc();}));});}
+function saveSrc(){try{localStorage.setItem('un_src',JSON.stringify([...SRCSEL]));}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
 const costRank={owned:0,lib:1,inc:2,paid:3,none:4};
 const costLabel={owned:'💰 Ejet',lib:'💰 Gratis (Libby)',inc:'💰 Spotify-timer',paid:'💳 BookBeat',none:''};
 const costPill=b=>{const c=costTier(b);return costLabel[c]?`<span class="badge cost-${c}">${costLabel[c]}</span>`:'';};
@@ -306,60 +333,80 @@ function budgetBanner(){
 // Everyday picks: uniform-random draw from books that FIT the card (equal odds, popular or
 // obscure). Only Deep cut and Hype check deliberately lean. Light rating floors keep out duds.
 const PICKS=[
- {k:'useit',ic:'⏳',lb:'Brug dine betalte timer',pool:()=>{const order=['BookBeat','Spotify'].sort((a,b)=>urg(b)-urg(a));
+ {k:'useit',lb:'Brug dine betalte timer',pool:()=>{const order=['BookBeat','Spotify'].sort((a,b)=>urg(b)-urg(a));
    for(const best of order){if(urg(best)<=0)continue;
      const pl=DATA.filter(b=>b.s===best&&b.r&&b.r>=3.4&&startable(b)&&spFits(b)&&srcOK(b));
      if(pl.length)return pl;}
    return [];},
   why:b=>{const bd=b.s==='BookBeat'?BUD.bb:BUD.sp;const rem=bd?((bd.limit||0)-(bd.used||0)):null;
-   return `Du har ${rem!=null?rem+' ':''}timer tilbage på ${b.s} i denne periode — de nulstilles uanset om du bruger dem. Start her før du går til de ejede bøger.`;}},
- {k:'free',ic:'💰',lb:'Gratis lige nu',pool:()=>DATA.filter(b=>freeNow(b)&&b.r&&b.r>=3.4&&startable(b)),why:b=>b.s==='Libby'?`Ledig på Libby nu — koster dig ingenting. Lån den før køen vender tilbage.`:`Du ejer den allerede (${b.s}) — nul kroner, ingen kø, ingen abonnementstimer.`},
- {k:'nowait',ic:'⚡',lb:'No waiting',pool:()=>DATA.filter(b=>availNow(b)&&b.r&&b.r>=3.5&&startable(b)),why:b=>`On ${b.s} right now — no waitlist, start it whenever.`},
- {k:'quick',ic:'🎧',lb:'Quick listen',pool:()=>DATA.filter(b=>availNow(b)&&b.hrs&&b.hrs<=9&&b.r&&b.r>=3.4&&startable(b)),why:b=>`Just ${b.hrs} hours on audio and available now — an easy one to finish.`},
- {k:'wreck',ic:'😭',lb:'Wreck me',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&startable(b)&&has(b,'sad','angst','emotional','grief','heartbreaking','tear')),why:b=>`Emotional and a little devastating — for when you want to feel something.`},
- {k:'cozy',ic:'☕',lb:'Cozy night',pool:()=>DATA.filter(b=>availNow(b)&&startable(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')),why:b=>`Low-stakes comfort you can start now. Pour a drink and relax.`},
- {k:'series',ic:'📚',lb:'Start a series',pool:()=>DATA.filter(b=>b.sn===1&&b.r&&b.r>=3.5),why:b=>`${b.se} #1 — kick off a new series.`},
- {k:'cont',ic:'📖',lb:'Continue a series',pool:()=>DATA.filter(b=>CONT[b.i]),why:b=>{const c=CONT[b.i];const lead=(c.er!=null)?`You rated “${c.et}” ${c.er}★`:`You've read “${c.et}”`;return `${lead} — pick up ${b.se||'the series'} where you left off (#${c.pos}).`;}},
- {k:'deep',ic:'💎',lb:'Deep cut',pool:()=>DATA.filter(b=>b.r&&b.r>=4.0&&b.rd!=null&&b.rd<4000&&startable(b)),why:b=>`Only ${b.rd?b.rd.toLocaleString():'a few'} readers but rated ${b.r} — a hidden gem. (This card leans obscure on purpose.)`},
- {k:'backlog',ic:'🕰️',lb:'Longest on your TBR',pool:()=>DATA.filter(b=>b.d&&b.r&&startable(b)).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Been on your list since ${b.d}. Maybe it's finally time.`},
- {k:'spicy',ic:'🌶️',lb:'Spicy pick',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&availNow(b)&&startable(b)),why:b=>`Spice ${b.sp}/5 and available now. Turn up the heat.`},
- {k:'hype',ic:'🔥',lb:'Hype check',pool:()=>DATA.filter(b=>b.rd!=null&&startable(b)).sort((a,b)=>b.rd-a.rd).slice(0,25),why:b=>`One of the most-read on your list — ${b.rd?b.rd.toLocaleString():'lots of'} readers. See if the hype holds. (This card leans popular on purpose.)`},
- {k:'surprise',ic:'🎲',lb:'Surprise me',pool:()=>DATA.filter(b=>b.r&&startable(b)),why:b=>`A totally random roll of your whole TBR — popular or obscure, equal odds.`},
+   return `Du har ${rem!=null?fmt(rem)+' t ':''}tilbage på ${b.s} i denne periode. Timerne nulstilles, uanset om du bruger dem, så start her før de ejede bøger.`;}},
+ {k:'free',lb:'Gratis nu',note:'Libby eller ejet',pool:()=>DATA.filter(b=>freeNow(b)&&b.r&&b.r>=3.4&&startable(b)),why:b=>b.s==='Libby'?`Ledig på Libby nu. Det koster ingenting, så lån den, før køen vender tilbage.`:`Du ejer den allerede (${b.s}): ingen kø og ingen abonnementstimer.`},
+ {k:'nowait',lb:'Ingen ventetid',pool:()=>DATA.filter(b=>availNow(b)&&b.r&&b.r>=3.5&&startable(b)),why:b=>`Klar på ${b.s} lige nu uden venteliste. Start den, når du vil.`},
+ {k:'quick',lb:'Kort lytning',pool:()=>DATA.filter(b=>availNow(b)&&b.hrs&&b.hrs<=9&&b.r&&b.r>=3.4&&startable(b)),why:b=>`Kun ${fmt(b.hrs)} timer og klar nu. Nem at gennemføre.`},
+ {k:'wreck',lb:'Knus mig',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&startable(b)&&has(b,'sad','angst','emotional','grief','heartbreaking','tear')),why:b=>`Følelsesladet og lidt ødelæggende, til når du vil mærke noget.`},
+ {k:'cozy',lb:'Hyggeaften',pool:()=>DATA.filter(b=>availNow(b)&&startable(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')),why:b=>`Let og trøstende, og klar nu. Skænk noget at drikke og slap af.`},
+ {k:'series',lb:'Start en serie',pool:()=>DATA.filter(b=>b.sn===1&&b.r&&b.r>=3.5),why:b=>`${b.se} #1: begynd på en ny serie.`},
+ {k:'cont',lb:'Fortsæt en serie',pool:()=>DATA.filter(b=>CONT[b.i]),why:b=>{const c=CONT[b.i];const lead=(c.er!=null)?`Du gav “${c.et}” ${c.er}★`:`Du har læst “${c.et}”`;return `${lead}. Tag ${b.se||'serien'} op igen (#${c.pos}).`;}},
+ {k:'deep',lb:'Deep cut',note:'vægtet mod mindre kendte',pool:()=>DATA.filter(b=>b.r&&b.r>=4.0&&b.rd!=null&&b.rd<4000&&startable(b)),why:b=>`Kun ${b.rd?b.rd.toLocaleString('da-DK'):'få'} læsere, men ${b.r} i rating: en skjult perle.`},
+ {k:'backlog',lb:'Længst på din TBR',pool:()=>DATA.filter(b=>b.d&&b.r&&startable(b)).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Været på din liste siden ${b.d}. Måske er tiden kommet.`},
+ {k:'spicy',lb:'Spicy valg',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&availNow(b)&&startable(b)),why:b=>`Spice ${b.sp}/5 og klar nu. Skru op for varmen.`},
+ {k:'hype',lb:'Hype check',note:'vægtet mod populære',pool:()=>DATA.filter(b=>b.rd!=null&&startable(b)).sort((a,b)=>b.rd-a.rd).slice(0,25),why:b=>`Blandt de mest læste på din liste, med ${b.rd?b.rd.toLocaleString('da-DK'):'mange'} læsere. Se om hypen holder.`},
+ {k:'surprise',lb:'Overrask mig',note:'helt tilfældig',pool:()=>DATA.filter(b=>b.r&&startable(b)),why:b=>`Et helt tilfældigt træk fra hele din TBR, populær eller obskur med lige odds.`},
 ];
 const idx={};
-function card(label,b,why,cyc,ai){return `<div class="card${ai?' ai':''}">${covImg(b,'cov')}<div class="body">
-  <div class="lblrow"><span class="lbl">${label}</span>${cyc||''}</div>
+const stLabel={now:'Klar nu',short:'Kort ventetid',long:'Lang ventetid',none:'Ingen adgang'};
+const stHTML=b=>b.s?`<span class="st st-${b.av||'none'}"><i></i>${stLabel[b.av]||stLabel.none}</span>`:'';
+const srcTxt=b=>{const c=costTier(b);const m={owned:'Ejet',lib:'Libby · gratis',inc:'Spotify · inkluderet',paid:'BookBeat · inkluderet'};return m[c]||(b.s&&b.s!=='Ingen'?b.s:'');};
+const hrsTxt=b=>b.hrs?`${fmt(b.hrs)} t`:(b.p?`${b.p} s.`:'');
+function cover(b,cls){const u=COV[b.i];
+  if(u)return `<img class="${cls}" src="${u}" alt="" loading="lazy" onerror="this.classList.add('blank')">`;
+  let h=0;const t=b.t||'';for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%360;
+  const pc=cls==='rcov'?'rcov rph':(cls==='hcov'?'ph hph':'ph');
+  return `<div class="${pc}" style="background:hsl(${h} 38% 86%)">${cls==='rcov'?'':(t.length>38?t.slice(0,36)+'…':t)}</div>`;}
+const readBtn=b=>`<button type="button" class="btn readbtn" data-id="${b.i}">Læs nu</button>`;
+function metaLine(b){return `${b.r!=null?`<span class="star">★ ${b.r.toFixed(2).replace('.',',')}</span>`:''}${stHTML(b)}${b.hrs?`<span>${hrsTxt(b)}</span>`:''}${srcTxt(b)?`<span>${srcTxt(b)}</span>`:''}${b.sp?`<span>🌶 ${b.sp}</span>`:''}`;}
+function card(label,b,why,cyc,ai,note){return `<div class="card">${cover(b,'cov')}<div class="body">
+  <div class="lblrow"><span class="lbl">${label}${note?` <span class="note">· ${note}</span>`:''}</span></div>
   <div class="bt">${link(b)}</div>
-  <div class="au">${b.a}${b.se?` · ${b.se}${b.sn?(' #'+b.sn):''}`:''}</div>
-  <div class="why">${why}</div>
-  <div class="meta">${rat(b)} ${srcBadge(b)} ${avBadge(b)} ${lenB(b)} ${b.sp?`<span class="badge">🌶️${b.sp}</span>`:''} ${readB(b)}</div>
+  <div class="au">${b.a||''}${b.se?` · ${b.se}${b.sn?(' #'+b.sn):''}`:''}</div>
+  <div class="why">${why||''}</div>
+  <div class="meta">${metaLine(b)}</div>
+  <div class="acts">${readBtn(b)}${cyc||''}</div>
 </div></div>`;}
 function renderPicks(){
  const host=document.getElementById('picks');host.innerHTML='';
- // AI vibe card first, in the same grid
  const ml=window._ml;
  if(ml&&ml.picks){const list=ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));
    if(list.length){ if(window._mlIdx==null)window._mlIdx=Math.floor(Math.random()*list.length);
      const pk=list[window._mlIdx%list.length];
-     const el=document.createElement('div');el.innerHTML=card('🤖 Your vibe',byId[pk.id],pk.reason||'',list.length>1?'<button class="cyc" id="mlcyc">↻</button>':'',true);host.appendChild(el.firstChild);}}
- // Anti-vibe card, right after the vibe card
+     const el=document.createElement('div');el.innerHTML=card('Din stemning',byId[pk.id],pk.reason||'',list.length>1?'<button type="button" class="btn ghost cyc" id="mlcyc">↻ Træk ny</button>':'',true,'ud fra dine seneste læsninger');host.appendChild(el.firstChild);}}
  const opp=window._opp;
  if(opp&&opp.picks){const list=opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));
    if(list.length){ if(window._oppIdx==null)window._oppIdx=Math.floor(Math.random()*list.length);
      const pk=list[window._oppIdx%list.length];
-     const el=document.createElement('div');el.innerHTML=card('🔀 Something completely different',byId[pk.id],pk.reason||'',list.length>1?'<button class="cyc" id="oppcyc">↻</button>':'',true);host.appendChild(el.firstChild);}}
+     const el=document.createElement('div');el.innerHTML=card('Noget helt andet',byId[pk.id],pk.reason||'',list.length>1?'<button type="button" class="btn ghost cyc" id="oppcyc">↻ Træk ny</button>':'',true,'det modsatte af dine seneste læsninger');host.appendChild(el.firstChild);}}
  PICKS.forEach(p=>{const pool=p.pool().filter(srcOK);if(!pool.length)return;
    if(idx[p.k]==null)idx[p.k]=Math.floor(Math.random()*pool.length);
    const b=pool[Math.min(idx[p.k],pool.length-1)];
-   const el=document.createElement('div');el.innerHTML=card(`${p.ic} ${p.lb}`,b,p.why(b),`<button class="cyc" data-k="${p.k}">↻</button>`,false);host.appendChild(el.firstChild);});
+   const el=document.createElement('div');el.innerHTML=card(p.lb,b,p.why(b),`<button type="button" class="btn ghost cyc" data-k="${p.k}">↻ Træk ny</button>`,false,p.note||'');host.appendChild(el.firstChild);});
  const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
  const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
  host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool().filter(srcOK);
    idx[p.k]=Math.floor(Math.random()*pool.length);renderPicks();});
 }
 function applyML(vibe,picks){window._ml={vibe:vibe,picks:picks};window._mlIdx=null;
- const v=document.getElementById('vibe');if(v)v.innerHTML=vibe?('<b>Your vibe right now:</b> “'+vibe+'”'):'';renderPicks();}
+ const v=document.getElementById('vibe');if(v)v.textContent=vibe||'';renderPicks();}
 function applyOpp(vibe,picks){window._opp={vibe:vibe,picks:picks};window._oppIdx=null;renderPicks();}
+document.addEventListener('click',async e=>{
+ const t=e.target.closest('.readbtn');
+ if(t){t.disabled=true;t.textContent='Starter…';
+   try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add_currently_reading',book_id:+t.dataset.id})});
+     const d=await r.json();if(d&&!d.error&&!d.errors){t.textContent='✓ Læser nu';}else{t.textContent='Kunne ikke opdatere';t.disabled=false;}}
+   catch(err){t.textContent='Kunne ikke opdatere';t.disabled=false;}
+   return;}
+ const a=e.target.closest('.arrow');
+ if(a){const s=a.closest('.upnextwrap').querySelector('.slider');s.scrollBy({left:(+a.dataset.dir)*300,behavior:'smooth'});}
+});
 async function loadML(){
  const cands=DATA.filter(b=>b.r&&startable(b)).sort((a,b)=>dc(b)-dc(a)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:(b.tg||'').split(',').slice(0,8).join(','),readers:b.rd,rating:b.r}));
  // Uden for Cowork: hent vibe'en live via workeren, som selv slår dine seneste
@@ -405,90 +452,135 @@ async function loadCovers(){
    const d=await r.json();(d.books||[]).forEach(x=>{if(x.cover)COV[x.id]=x.cover;});}catch(e){}
  renderPicks();update();renderHero(window._heroPick||null);renderUpNext(window._upnext);
 }
-// Featured section: your hand-curated "Up Next" list on Hardcover, fetched LIVE from the
-// worker on every page load — books you add during the week appear immediately, no rebuild.
-// These bypass the startable/pool logic entirely: you picked them, so they're always shown.
-function renderUpNext(list){
- window._upnext=list; const host=document.getElementById('upnext'); if(!host)return;
- if(!list||!list.length){host.innerHTML='';return;}
- list.forEach(x=>{if(x.cover)COV[x.id]=x.cover;});
- const cards=list.map(x=>{const b=byId[x.id]||{i:x.id,t:x.t,a:x.a,sl:x.hc};
-   return card('⭐ Up Next',b,'You added this to your Up Next list on Hardcover.','',false);}).join('');
- host.innerHTML=`<div class="upnextwrap"><div class="unhdr">⭐ Your Up Next</div><div class="unsub">Hand-picked by you on Hardcover — pulled live every time this page loads. Swipe →</div><div class="slider">${cards}</div></div>`;
-}
 async function loadUpNext(){
  try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'get_list',list_id:P.upnext})});
    const d=await r.json();renderUpNext((d&&d.books)||[]);}catch(e){renderUpNext([]);}
-}
-// Pinned hero: next unread book in a series you're ACTIVELY reading — i.e. one of
-// your last 3 finished books is in an unfinished series. Live via the worker; if
-// none qualify (or the worker isn't updated yet), the hero stays hidden.
-function renderHero(pick){
- window._heroPick=pick;
- const host=document.getElementById('serieshero'); if(!host)return;
- if(!pick){host.innerHTML='';return;}
- if(pick.cover)COV[pick.id]=pick.cover;
- const onTbr=byId[pick.id];
- const b=onTbr||{i:pick.id,t:pick.t,a:pick.a,sl:pick.sl,se:pick.series,sn:pick.snum};
- const cov=COV[pick.id]?`<img class="hcov" src="${COV[pick.id]}" alt="" onerror="this.style.visibility='hidden'">`:`<div class="hcov"></div>`;
- const f=pick.from||{}; const rated=(f.r!=null)?` (${f.r}★)`:''; const dt=f.date?(' on '+String(f.date).slice(0,10)):'';
- const why=`You just finished “${f.t||'the previous book'}”${rated}${dt} — here's #${pick.snum} in ${pick.series}.`;
- const meta=onTbr?`${rat(b)} ${srcBadge(b)} ${avBadge(b)} ${lenB(b)} ${readB(b)} `:`<span class="pill av-none">Not on your TBR yet</span> `;
- const avail=meta+`<button class="addbtn" id="heroAdd">＋ Start reading</button>`;
- host.innerHTML=`<div class="hero">${cov}<div class="hbody">
-   <div class="hlbl">📚 Next in a series you're reading</div>
-   <div class="htitle">${link(b)}</div>
-   <div class="hau">${b.a||pick.a||''}${pick.series?` · ${pick.series} #${pick.snum}`:''}</div>
-   <div class="hwhy">${why}</div>
-   <div class="meta">${avail}</div>
- </div></div>`;
- const add=document.getElementById('heroAdd');
- if(add)add.onclick=async()=>{add.disabled=true;add.textContent='Starting…';
-   try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add_currently_reading',book_id:pick.id})});
-     const d=await r.json(); if(d&&!d.error&&!d.errors){add.textContent='✓ Currently reading';}else{add.textContent='Couldn’t update';add.disabled=false;}}
-   catch(e){add.textContent='Couldn’t update';add.disabled=false;}};
 }
 async function loadNextInSeries(){
  try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'next_in_series'})});
    const d=await r.json(); renderHero(d&&d.pick?d.pick:null);}catch(e){renderHero(null);}
 }
+// Din Up Next: din håndplukkede liste på Hardcover, hentet live via workeren. Vises altid (omgår pool/startable).
+function renderUpNext(list){
+ window._upnext=list; const host=document.getElementById('upnext'); if(!host)return;
+ if(!list||!list.length){host.innerHTML='';return;}
+ list.forEach(x=>{if(x.cover)COV[x.id]=x.cover;});
+ const cards=list.map(x=>{const b=byId[x.id]||{i:x.id,t:x.t,a:x.a,sl:x.hc};
+   return card('Up Next',b,'Du tilføjede den til din Up Next-liste på Hardcover.','',false);}).join('');
+ host.innerHTML=`<div class="upnextwrap"><div class="unhead"><div><h2 style="margin-top:6px">Din Up Next</h2><p class="h2sub" style="margin-bottom:0">Håndplukket af dig på Hardcover. Hentes live, hver gang siden åbnes.</p></div><div class="arrows"><button type="button" class="arrow" data-dir="-1" aria-label="Forrige">←</button><button type="button" class="arrow" data-dir="1" aria-label="Næste">→</button></div></div><div class="slider">${cards}</div></div>`;
+}
+// Næste bog: næste i en serie du er i gang med (live fra workeren). Findes den ikke, trækkes en bog fra "Brug dine betalte timer"/"Gratis".
+function renderHero(pick){window._heroPick=pick;renderNext();}
+function nextPool(){for(const k of ['useit','free','nowait']){const p=PICKS.find(x=>x.k===k);const pool=p?p.pool().filter(srcOK):[];if(pool.length)return {pool,p};}return {pool:[],p:null};}
+function renderNext(){
+ const host=document.getElementById('serieshero'); if(!host)return;
+ const pick=window._heroPick; let b,why,label,cyc='';
+ if(pick){
+   if(pick.cover)COV[pick.id]=pick.cover;
+   const onTbr=byId[pick.id];
+   b=onTbr||{i:pick.id,t:pick.t,a:pick.a,sl:pick.sl,se:pick.series,sn:pick.snum};
+   const f=pick.from||{}; const rated=(f.r!=null)?` (${f.r}★)`:''; const dt=f.date?(' den '+String(f.date).slice(0,10)):'';
+   why=`Du har lige læst “${f.t||'den forrige bog'}”${rated}${dt}. Her er #${pick.snum} i ${pick.series}.`;
+   label='Næste bog · næste i din serie';
+   if(!onTbr)b=Object.assign({},b,{s:null});
+ } else {
+   const {pool,p}=nextPool(); if(!pool.length){host.innerHTML='';return;}
+   if(window._nextIdx==null)window._nextIdx=Math.floor(Math.random()*pool.length);
+   b=pool[window._nextIdx%pool.length]; why=p.why(b); label='Næste bog';
+   cyc='<button type="button" class="btn ghost" id="nextcyc">↻ Træk ny</button>';
+ }
+ host.innerHTML=`<div class="hero">${cover(b,'hcov')}<div class="hbody">
+   <div class="hlbl">${label}</div>
+   <div class="htitle">${link(b)}</div>
+   <div class="hau">${b.a||''}${b.se?` · ${b.se}${b.sn?(' #'+b.sn):''}`:''}</div>
+   <div class="hwhy">${why}</div>
+   <div class="meta">${b.s?metaLine(b):'<span>Ikke på din TBR endnu</span>'}</div>
+   <div class="acts">${readBtn(b)}${cyc}</div>
+ </div></div>`;
+ const nc=document.getElementById('nextcyc');if(nc)nc.onclick=()=>{window._nextIdx=(window._nextIdx||0)+1+Math.floor(Math.random()*5);renderNext();};
+}
+function renderStatus(){
+ const h=document.getElementById('hoursline'),bx=document.getElementById('budgetbox');
+ const r1=remFor('BookBeat'),r2=remFor('Spotify'),p=[];
+ if(r1!=null)p.push(`BookBeat <b>${fmt(r1)} t</b>`);if(r2!=null)p.push(`Spotify <b>${fmt(r2)} t</b>`);
+ if(h)h.innerHTML=p.length?'Timer tilbage: '+p.join(' · '):'';
+ const bb=budgetBanner();if(bx)bx.innerHTML=bb?`<details><summary>Hvad skal jeg bruge først?</summary>${bb}</details>`:'';
+}
 const CHIPS=['enemies to lovers','grumpy sunshine','forced proximity','slow burn','found family','small town','fake relationship','forbidden love','second chance','dark','emotional','funny','fantasy','thriller','historical'];
-function renderChips(){const c=document.getElementById('chips');CHIPS.forEach(t=>{const s=document.createElement('span');s.className='chip';s.textContent=t;s.onclick=()=>{fText.value=t;update();};c.appendChild(s);});}
+function renderChips(){const c=document.getElementById('chips');c.innerHTML='';CHIPS.forEach(t=>{const s=document.createElement('button');s.type='button';s.className='chip';s.textContent=t;s.onclick=()=>{fText.value=t;update();};c.appendChild(s);});}
+const SORTS=[['useit','Brug mine timer'],['cheap','Billigst først'],['rating','Højest bedømt'],['hours','Kortest'],['added','Længst på TBR'],['deep','Deep-cut score'],['rand','Tilfældig']];
+function buildGroups(){
+ const r=document.getElementById('fRate'),s=document.getElementById('fSpice'),so=document.getElementById('fSort');
+ r.innerHTML='';[[0,'Alle'],[3.75,'★ 3,75+'],[4,'★ 4+'],[4.25,'★ 4,25+']].forEach(([v,l])=>{const b=mkTg(l,F.rate===v,()=>{F.rate=v;update();});b.dataset.v=v;r.appendChild(b);});
+ s.innerHTML='';[[0,'Alle'],[1,'1+'],[2,'2+'],[3,'3+'],[4,'4+']].forEach(([v,l])=>{const b=mkTg(l,F.spice===v,()=>{F.spice=v;update();});b.dataset.v=v;s.appendChild(b);});
+ so.innerHTML=SORTS.map(([k,l])=>`<label><input type="radio" name="fs" value="${k}"${F.sort===k?' checked':''}> ${l}</label>`).join('');
+ so.querySelectorAll('input').forEach(i=>i.onchange=()=>{F.sort=i.value;update();});
+}
+function syncUI(){
+ const set=(id,v)=>document.getElementById(id).setAttribute('aria-pressed',v?'true':'false');
+ set('qNow',F.now);set('qFree',F.free);set('qFit',F.fit);set('qDeep',F.deep);set('qSeries',F.series);
+ document.querySelectorAll('#fRate .tg').forEach(b=>b.setAttribute('aria-pressed',(+b.dataset.v===F.rate)?'true':'false'));
+ document.querySelectorAll('#fSpice .tg').forEach(b=>b.setAttribute('aria-pressed',(+b.dataset.v===F.spice)?'true':'false'));
+ document.querySelectorAll('#fSort input').forEach(i=>i.checked=(i.value===F.sort));
+ const q=document.getElementById('qFit');const r1=remFor('BookBeat'),r2=remFor('Spotify');
+ q.title=(r1!=null||r2!=null)?`BookBeat ${r1!=null?fmt(r1)+' t':'–'} · Spotify ${r2!=null?fmt(r2)+' t':'–'} tilbage`:'';
+ document.getElementById('fHours').disabled=F.fit;
+ document.getElementById('fhVal').textContent=F.fit?'låst til dit budget':(F.maxh>=30?'alle':('≤ '+F.maxh+' t'));
+ document.getElementById('fitHint').textContent=F.fit?`Låst, mens "Passer i mine timer" er slået til: BookBeat ${r1!=null?fmt(r1):'–'} t, Spotify ${r2!=null?fmt(r2):'–'} t. Ejede bøger og Libby er ikke begrænset.`:'';
+}
+function resetAll(){Object.assign(F,{now:false,free:false,fit:false,deep:false,series:false,rate:0,spice:0,maxh:30,txt:''});document.getElementById('fText').value='';document.getElementById('fHours').value=30;SRCSEL=new Set(SRCS);try{localStorage.removeItem('un_src');}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
 function update(){
- const av=fAvail.value,cost=fCost.value,txt=fText.value.trim().toLowerCase(),maxh=+fHours.value,minr=+fRate.value,minsp=+fSpice.value,deep=fDeep.checked,seriesOnly=fSeries.checked,sort=fSort.value;
- fhVal.textContent=maxh>=30?'any':('≤'+maxh+'h');frVal.textContent=minr<=0?'any':('≥'+minr.toFixed(1));
+ F.txt=fText.value.trim().toLowerCase(); F.maxh=+fHours.value;
  let rows=DATA.filter(b=>{
    if(!srcOK(b))return false;
-   if(av==='now'&&!availNow(b))return false;if(av==='soon'&&!availSoon(b))return false;
-   if(cost!=='any'){const ct=costTier(b);
-     if(cost==='freenow'&&!freeNow(b))return false;
-     if(cost==='free'&&!(ct==='owned'||ct==='lib'))return false;
-     if(cost==='nobb'&&(ct==='paid'||ct==='none'))return false;
-     if(cost==='owned'&&ct!=='owned')return false;}
-   if(txt){const hay=(b.t+' '+b.a+' '+(b.tg||'')+' '+(b.se||'')).toLowerCase();if(!hay.includes(txt))return false;}
-   if(window._fitH&&(!b.hrs||b.hrs>window._fitH))return false;if(maxh<30){if(!b.hrs||b.hrs>maxh)return false;} if(minr>0){if(!b.r||b.r<minr)return false;}
-   if(minsp>0){if(!b.sp||b.sp<minsp)return false;} if(deep){if(b.rd==null||b.rd>=8000)return false;}
-   if(seriesOnly&&b.sn!==1)return false;
-   if(!txt&&!startable(b))return false; // hide un-startable mid-series books unless searching by name
+   if(F.now&&!availNow(b))return false;
+   if(F.free){const ct=costTier(b);if(!(ct==='owned'||ct==='lib'))return false;}
+   if(F.fit){if(!fitsOwn(b))return false;}else if(F.maxh<30){if(!b.hrs||b.hrs>F.maxh)return false;}
+   if(F.rate>0&&(!b.r||b.r<F.rate))return false;
+   if(F.spice>0&&(!b.sp||b.sp<F.spice))return false;
+   if(F.deep&&(b.rd==null||b.rd>=8000))return false;
+   if(F.series&&b.sn!==1)return false;
+   if(F.txt){const hay=(b.t+' '+b.a+' '+(b.tg||'')+' '+(b.se||'')).toLowerCase();if(!hay.includes(F.txt))return false;}
+   if(!F.txt&&!startable(b))return false;
    return true;});
+ const sort=F.sort;
  if(sort==='useit')rows.sort((a,b)=>(urgency(b)-urgency(a))||dc(b)-dc(a));
  else if(sort==='cheap')rows.sort((a,b)=>(costRank[costTier(a)]-costRank[costTier(b)])||(lbDays(a)-lbDays(b))||dc(b)-dc(a));
  else if(sort==='deep')rows.sort((a,b)=>dc(b)-dc(a));else if(sort==='rating')rows.sort((a,b)=>(b.r||0)-(a.r||0));
  else if(sort==='hours')rows.sort((a,b)=>(a.hrs||999)-(b.hrs||999));else if(sort==='added')rows.sort((a,b)=>(a.d||'9999').localeCompare(b.d||'9999'));
  else if(sort==='rand')rows.sort(()=>Math.random()-.5);
- rc.textContent=`${rows.length} book${rows.length===1?'':'s'} match`;
+ const act=[];
+ if(SRCSEL.size<SRCS.length)act.push(['Kilde: '+[...SRCSEL].join(', '),()=>{SRCSEL=new Set(SRCS);saveSrc();}]);
+ if(F.now)act.push(['Klar nu',()=>{F.now=false;update();}]);
+ if(F.free)act.push(['Gratis',()=>{F.free=false;update();}]);
+ if(F.fit)act.push(['Passer i mine timer',()=>{F.fit=false;update();}]);
+ if(!F.fit&&F.maxh<30)act.push(['Max '+F.maxh+' t',()=>{fHours.value=30;update();}]);
+ if(F.deep)act.push(['Deep cuts',()=>{F.deep=false;update();}]);
+ if(F.series)act.push(['Serie-starter',()=>{F.series=false;update();}]);
+ if(F.rate>0)act.push(['★ '+String(F.rate).replace('.',',')+'+',()=>{F.rate=0;update();}]);
+ if(F.spice>0)act.push(['Spice '+F.spice+'+',()=>{F.spice=0;update();}]);
+ if(F.txt)act.push(['“'+F.txt+'”',()=>{fText.value='';update();}]);
+ const ah=document.getElementById('active');ah.innerHTML='';
+ act.forEach(([l,fn])=>{const s=document.createElement('span');s.className='achip';s.appendChild(document.createTextNode(l));const x=document.createElement('button');x.type='button';x.setAttribute('aria-label','Fjern filter: '+l);x.textContent='×';x.onclick=fn;s.appendChild(x);ah.appendChild(s);});
+ if(act.length){const n=document.createElement('button');n.type='button';n.className='linkbtn';n.textContent='Nulstil';n.onclick=resetAll;ah.appendChild(n);}
+ syncUI();
+ const sl=(SORTS.find(x=>x[0]===sort)||[0,''])[1];
+ rc.textContent=`${rows.length} ${rows.length===1?'bog':'bøger'} · sorteret efter ${sl.toLowerCase()}`;
  const res=document.getElementById('results');res.innerHTML='';
+ if(!rows.length){res.innerHTML='<div class="rowcount">Ingen bøger matcher. <button type="button" class="linkbtn" id="resetEmpty">Nulstil filtre</button></div>';document.getElementById('resetEmpty').onclick=resetAll;}
  rows.slice(0,80).forEach((b,n)=>{const d=document.createElement('div');d.className='row';
-   d.innerHTML=`<div class="rrank">${n+1}</div>${covImg(b,'rcov')}<div class="rmid"><div class="ti">${link(b)} <span class="ra">· ${b.a}</span></div>
+   d.innerHTML=`<div class="rrank">${n+1}</div>${cover(b,'rcov')}<div class="rmid"><div class="ti">${link(b)} <span class="ra">· ${b.a}</span></div>
      <div class="tagline">${(b.tg||'').split(',').slice(0,6).map(s=>s.trim()).filter(Boolean).join(' · ')}</div></div>
-     <div class="rmeta">${rat(b)}<br>${srcBadge(b)} ${costPill(b)} ${avBadge(b)} ${lenB(b)} ${readB(b)}</div>`;res.appendChild(d);});
- if(rows.length>80)res.insertAdjacentHTML('beforeend',`<div class="rowcount">…and ${rows.length-80} more — narrow with filters.</div>`);
+     <div class="rmeta">${stHTML(b)}<span>${[b.r!=null?'★ '+b.r.toFixed(2).replace('.',','):'',hrsTxt(b),srcTxt(b)].filter(Boolean).join(' · ')}</span></div>`;res.appendChild(d);});
+ if(rows.length>80)res.insertAdjacentHTML('beforeend',`<div class="rowcount">…og ${rows.length-80} flere. Indsnævr med filtrene.</div>`);
 }
-['fAvail','fCost','fText','fHours','fRate','fSpice','fDeep','fSeries','fSort'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
-document.getElementById('sub').textContent=`${DATA.length} books · ${DATA.filter(availNow).length} available right now · snapshot ${new Date().toISOString().slice(0,10)}`;
-document.getElementById('foot').innerHTML='Deep-cut score = rating + a bonus for few readers, so hidden gems rise above bestsellers. Length = audiobook hours. Covers load live from Hardcover. The 🤖 vibe pick is synthesized across your last 5 reads; 🔀 Something completely different is its opposite, for when you want to flip your pattern — both are generated live from your latest finishes, and refresh whenever you finish a new book.';
-document.getElementById('budgetbox').innerHTML=budgetBanner();
-renderSrcFilter();document.getElementById('fFit').onclick=applyFit;document.getElementById('fFitH').addEventListener('input',function(){this.dataset.user=1;});renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();
+function wire(){
+ [['qNow','now'],['qFree','free'],['qFit','fit'],['qDeep','deep'],['qSeries','series']].forEach(([id,k])=>document.getElementById(id).onclick=()=>{F[k]=!F[k];update();});
+ ['fText','fHours'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
+}
+document.getElementById('sub').textContent=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · opdateret ${new Date().toISOString().slice(0,10)}`;
+document.getElementById('foot').innerHTML='Deep-cut score = rating + bonus for få læsere, så skjulte perler rykker op over bestsellere. Længde = lydbogstimer. Covers hentes live fra Hardcover. "Din stemning" bygger på dine seneste læsninger, og "Noget helt andet" er det modsatte, så du kan bryde mønsteret. Begge opdateres, når du har læst noget nyt.';
+renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
