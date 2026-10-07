@@ -35,7 +35,8 @@ UP_NEXT_LIST = 465056   # Xenia's hand-curated "Up Next" list on Hardcover; fetc
 _LIGHT = ('funny', 'humor', 'humour', 'lighthearted', 'light-hearted', 'rom-com', 'romantic comedy',
           'comedy', 'cozy', 'feel-good', 'feel good', 'heartwarming', 'banter', 'cute', 'wholesome', 'whimsical')
 _HEAVY = ('angst', 'sad', 'grief', 'dark', 'heartbreaking', 'tragic', 'tear', 'trauma', 'emotional')
-def _has(b, kws): t = (b.get('tags') or ''); return any(k in t for k in kws)
+import re as _re
+def _has(b, kws): t = (b.get('tags') or ''); return any(_re.search(r'(^|[^a-z])' + _re.escape(k) + r'([^a-z]|$)', t, _re.I) for k in kws)
 _opp = sorted([b for b in data if b.get('rating') and b['rating'] >= 3.6 and _has(b, _LIGHT) and not _has(b, _HEAVY)],
               key=lambda b: -(b['rating'] or 0))
 BAKED_OPP = {
@@ -211,7 +212,8 @@ input[type=range]{width:200px;accent-color:var(--ink)}
 </div>
 <script>
 const P=__DATA__; const DATA=P.books; let RECENT=P.recent; const BAKED=P.baked; const BAKED_OPP=P.bakedOpp||{picks:[]}; const CONT=P.cont||{}; const COV={};
-const has=(b,...kw)=>{const t=(b.tg||'');return kw.some(k=>t.includes(k));};
+const _re={};
+const has=(b,...kw)=>{const t=(b.tg||'');return kw.some(k=>{const r=_re[k]||(_re[k]=new RegExp('(^|[^a-z])'+k.replace(/[.*+?^${}()|[\]\\\/]/g,'\\$&')+'([^a-z]|$)','i'));return r.test(t);});};
 const availNow=b=>b.av==='now'; const availSoon=b=>b.av==='now'||b.av==='short';
 const srcBadge=b=>`<span class="badge src-${b.s}">${b.s}</span>`;
 const avLabel={now:'Available now',short:'Short wait',long:'Long wait',none:'Not available'};
@@ -317,7 +319,8 @@ function budgetBanner(){
     const spildt=Math.round((rem-naar)*10)/10;
     parts.push(`<b>${navn}</b> ${o.used||0} / ${o.limit} t brugt · ${rem} t tilbage på ${d} dage`
       +(rem>0?` · når ca. <b>${Math.round(naar*10)/10} t</b> i dit tempo${spildt>0.5?` (${spildt} t udløber uanset hvad)`:''}`:' · <b>loft nået</b>'));
-    if(u>pushU){pushU=u;push=navn;pushDays=d;}
+    const usable=DATA.some(b=>b.s===srcKey&&b.r&&b.r>=3.4&&startable(b)&&fitsOwn(b));
+    if(usable&&u>pushU){pushU=u;push=navn;pushDays=d;}
     levelU=Math.max(levelU,rawUrg(rem,d));
   };
   if(BUD.bb) line('BookBeat',BUD.bb,'BookBeat');
@@ -347,16 +350,19 @@ const PICKS=[
  {k:'free',lb:'Gratis nu',note:'Libby eller ejet',pool:()=>DATA.filter(b=>freeNow(b)&&b.r&&b.r>=3.4&&startable(b)),why:b=>b.s==='Libby'?`Ledig på Libby nu. Det koster ingenting, så lån den, før køen vender tilbage.`:`Du ejer den allerede (${b.s}): ingen kø og ingen abonnementstimer.`},
  {k:'nowait',lb:'Ingen ventetid',pool:()=>DATA.filter(b=>availNow(b)&&b.r&&b.r>=3.5&&startable(b)),why:b=>`Klar på ${b.s} lige nu uden venteliste. Start den, når du vil.`},
  {k:'quick',lb:'Kort lytning',pool:()=>DATA.filter(b=>availNow(b)&&b.hrs&&b.hrs<=9&&b.r&&b.r>=3.4&&startable(b)),why:b=>`Kun ${fmt(b.hrs)} timer og klar nu. Nem at gennemføre.`},
- {k:'wreck',lb:'Knus mig',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&startable(b)&&has(b,'sad','angst','emotional','grief','heartbreaking','tear')),why:b=>`Følelsesladet og lidt ødelæggende, til når du vil mærke noget.`},
- {k:'cozy',lb:'Hyggeaften',pool:()=>DATA.filter(b=>availNow(b)&&startable(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')&&!has(b,'dark','depress','sad','tense','horror','grief','suicide','self harm','abuse','mental illness','challenging','disturbing','violence','war','death')),why:b=>`Let og trøstende, og klar nu. Skænk noget at drikke og slap af.`},
+ {k:'wreck',lb:'Knus mig',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&startable(b)&&(has(b,'sad','tearjerking','heartbreaking','death / grief','grief')||(has(b,'angst')&&has(b,'emotional')))),why:b=>`Følelsesladet og lidt ødelæggende, til når du vil mærke noget.`},
+ {k:'cozy',lb:'Hyggeaften',pool:()=>DATA.filter(b=>availNow(b)&&startable(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')&&!has(b,'dark','depress','sad','tense','horror','grief','suicide','self harm','abuse','mental illness','challenging','disturbing','violence','war','death','angst')),why:b=>`Let og trøstende, og klar nu. Skænk noget at drikke og slap af.`},
  {k:'series',lb:'Start en serie',pool:()=>DATA.filter(b=>b.sn===1&&b.r&&b.r>=3.5),why:b=>`${b.se} #1: begynd på en ny serie.`},
  {k:'cont',lb:'Fortsæt en serie',pool:()=>DATA.filter(b=>CONT[b.i]),why:b=>{const c=CONT[b.i];const lead=(c.er!=null)?`Du gav “${c.et}” ${c.er}★`:`Du har læst “${c.et}”`;return `${lead}. Tag ${b.se||'serien'} op igen (#${c.pos}).`;}},
  {k:'deep',lb:'Deep cut',note:'vægtet mod mindre kendte',pool:()=>DATA.filter(b=>b.r&&b.r>=4.0&&b.rd!=null&&b.rd<4000&&startable(b)),why:b=>`Kun ${b.rd?b.rd.toLocaleString('da-DK'):'få'} læsere, men ${b.r} i rating: en skjult perle.`},
- {k:'backlog',lb:'Længst på din TBR',pool:()=>DATA.filter(b=>b.d&&b.r&&startable(b)).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Været på din liste siden ${b.d}. Måske er tiden kommet.`},
+ {k:'backlog',lb:'Længst på din TBR',pool:()=>DATA.filter(b=>b.d&&b.r&&startable(b)&&reach(b)).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Været på din liste siden ${b.d}. Måske er tiden kommet.`},
  {k:'spicy',lb:'Spicy valg',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&availNow(b)&&startable(b)),why:b=>`Spice ${b.sp}/5 og klar nu. Skru op for varmen.`},
- {k:'hype',lb:'Hype check',note:'vægtet mod populære',pool:()=>DATA.filter(b=>b.rd!=null&&startable(b)).sort((a,b)=>b.rd-a.rd).slice(0,25),why:b=>`Blandt de mest læste på din liste, med ${b.rd?b.rd.toLocaleString('da-DK'):'mange'} læsere. Se om hypen holder.`},
+ {k:'hype',lb:'Hype check',note:'vægtet mod populære',pool:()=>DATA.filter(b=>b.rd!=null&&startable(b)&&reach(b)).sort((a,b)=>b.rd-a.rd).slice(0,25),why:b=>`Blandt de mest læste på din liste, med ${b.rd?b.rd.toLocaleString('da-DK'):'mange'} læsere. Se om hypen holder.`},
  {k:'surprise',lb:'Overrask mig',note:'helt tilfældig',pool:()=>DATA.filter(b=>b.r&&startable(b)),why:b=>`Et helt tilfældigt træk fra hele din TBR, populær eller obskur med lige odds.`},
 ];
+// Naabar: kan hun faktisk gaa i gang nu? Klar/kort ventetid, har en kilde, og passer i timerne tilbage.
+const reach=b=>(b.av==='now'||b.av==='short')&&!!b.s&&b.s!=='Ingen'&&fitsOwn(b);
+PICKS.forEach(p=>{const o=p.pool;p.pool=()=>o().filter(reach);});
 const idx={};
 const stLabel={now:'Klar nu',short:'Kort ventetid',long:'Lang ventetid',none:'Ingen adgang'};
 const stHTML=b=>b.s?`<span class="st st-${b.av||'none'}"><i></i>${stLabel[b.av]||stLabel.none}</span>`:'';
@@ -380,12 +386,12 @@ function card(label,b,why,cyc,ai,note){return `<div class="card">${cover(b,'cov'
 function renderPicks(){
  const host=document.getElementById('picks');host.innerHTML='';
  const ml=window._ml;
- if(ml&&ml.picks){const list=ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));
+ if(ml&&ml.picks){const list=ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));
    if(list.length){ if(window._mlIdx==null)window._mlIdx=Math.floor(Math.random()*list.length);
      const pk=list[window._mlIdx%list.length];
      const el=document.createElement('div');el.innerHTML=card('Din stemning',byId[pk.id],pk.reason||'',list.length>1?'<button type="button" class="btn ghost cyc" id="mlcyc">↻ Træk ny</button>':'',true,'ud fra dine seneste læsninger');host.appendChild(el.firstChild);}}
  const opp=window._opp;
- if(opp&&opp.picks){const list=opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));
+ if(opp&&opp.picks){const list=opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));
    if(list.length){ if(window._oppIdx==null)window._oppIdx=Math.floor(Math.random()*list.length);
      const pk=list[window._oppIdx%list.length];
      const el=document.createElement('div');el.innerHTML=card('Noget helt andet',byId[pk.id],pk.reason||'',list.length>1?'<button type="button" class="btn ghost cyc" id="oppcyc">↻ Træk ny</button>':'',true,'det modsatte af dine seneste læsninger');host.appendChild(el.firstChild);}}
@@ -393,8 +399,8 @@ function renderPicks(){
    if(idx[p.k]==null)idx[p.k]=Math.floor(Math.random()*pool.length);
    const b=pool[Math.min(idx[p.k],pool.length-1)];
    const el=document.createElement('div');el.innerHTML=card(p.lb,b,p.why(b),`<button type="button" class="btn ghost cyc" data-k="${p.k}">↻ Træk ny</button>`,false,p.note||'');host.appendChild(el.firstChild);});
- const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
- const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id]));window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
+ const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
+ const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
  host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool().filter(srcOK);
    idx[p.k]=Math.floor(Math.random()*pool.length);renderPicks();});
 }
@@ -412,7 +418,7 @@ document.addEventListener('click',async e=>{
  if(a){const s=a.closest('.upnextwrap').querySelector('.slider');s.scrollBy({left:(+a.dataset.dir)*300,behavior:'smooth'});}
 });
 async function loadML(){
- const cands=DATA.filter(b=>b.r&&startable(b)).sort((a,b)=>dc(b)-dc(a)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:(b.tg||'').split(',').slice(0,8).join(','),readers:b.rd,rating:b.r}));
+ const cands=DATA.filter(b=>b.r&&startable(b)&&reach(b)).sort((a,b)=>dc(b)-dc(a)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:(b.tg||'').split(',').slice(0,8).join(','),readers:b.rd,rating:b.r}));
  // Uden for Cowork: hent vibe'en live via workeren, som selv slår dine seneste
  // finishes op og cacher svaret indtil du har læst noget nyt. Fejler det, falder
  // vi tilbage til den bagte vibe fra det ugentlige build.
