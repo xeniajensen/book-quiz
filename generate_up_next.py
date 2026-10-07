@@ -118,6 +118,7 @@ a{color:inherit}
 .bt a{text-decoration:none}.bt a:hover{text-decoration:underline}
 .au{color:var(--ink2);font-size:13px;margin-bottom:6px}
 .why{font-size:14px;color:var(--ink);line-height:1.5}
+.upnextwrap .why{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
 .meta{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-top:9px;font-size:13px;color:var(--ink2)}
 .star{color:var(--ink);font-weight:600}
 .st{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink)}
@@ -464,12 +465,26 @@ async function loadNextInSeries(){
    const d=await r.json(); renderHero(d&&d.pick?d.pick:null);}catch(e){renderHero(null);}
 }
 // Din Up Next: din håndplukkede liste på Hardcover, hentet live via workeren. Vises altid (omgår pool/startable).
+// Beskrivelse til Up Next-kort: Hardcover-synopsis hvis workeren leverer den, ellers bygget af tags/serie/vurdering.
+function upWhy(b,x){
+ const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+ let d=(x&&x.desc)?String(x.desc).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim():'';
+ if(d){if(d.length>240)d=d.slice(0,240).replace(/\s+\S*$/,'')+'…';return esc(d);}
+ const bits=[];
+ const tags=(b.tg||'').split(',').map(t=>t.trim()).filter(t=>t&&!/^(fiction|romance|contemporary|medium-paced|fast-paced|slow-paced)$/i.test(t)).slice(0,5);
+ if(tags.length)bits.push(esc(tags.join(' · ')));
+ if(b.se)bits.push(`${b.sn?'Bind '+b.sn+' i':'Del af'} serien ${esc(b.se)}`);
+ if(b.sp)bits.push(`spice ${b.sp}/5`);
+ const src=srcTxt(b);
+ if(b.av==='now'&&src)bits.push(`klar nu (${esc(src)})`);else if(b.s&&b.s!=='Ingen')bits.push(esc(b.s));
+ return bits.length?bits.join('. ')+'.':'Ligger på din Up Next-liste på Hardcover. Ingen yderligere data om bogen endnu.';
+}
 function renderUpNext(list){
  window._upnext=list; const host=document.getElementById('upnext'); if(!host)return;
  if(!list||!list.length){host.innerHTML='';return;}
  list.forEach(x=>{if(x.cover)COV[x.id]=x.cover;});
  const cards=list.map(x=>{const b=byId[x.id]||{i:x.id,t:x.t,a:x.a,sl:x.hc};
-   return card('Up Next',b,'Du tilføjede den til din Up Next-liste på Hardcover.','',false);}).join('');
+   return card('Up Next',b,upWhy(b,x),'',false);}).join('');
  host.innerHTML=`<div class="upnextwrap"><div class="unhead"><div><h2 style="margin-top:6px">Din Up Next</h2><p class="h2sub" style="margin-bottom:0">Håndplukket af dig på Hardcover. Hentes live, hver gang siden åbnes.</p></div><div class="arrows"><button type="button" class="arrow" data-dir="-1" aria-label="Forrige">←</button><button type="button" class="arrow" data-dir="1" aria-label="Næste">→</button></div></div><div class="slider">${cards}</div></div>`;
 }
 // Næste bog: næste i en serie du er i gang med (live fra workeren). Findes den ikke, trækkes en bog fra "Brug dine betalte timer"/"Gratis".
