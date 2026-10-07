@@ -230,6 +230,7 @@ let _freeFirst = true;   // "optimér efter pris/timer" til/fra
 function srcBonus(b) {
   if(!_freeFirst) return 0;
   const scale = 1.4;                          // vægt mod smagsmatch
+  if((b.s==='BB'||b.s==='SP') && !fits(b)) return -2;   // kan ikke nås på de resterende timer
   if(b.s==='BB') return scale * Math.max(-3, Math.min(4, urgOf('bb')));
   if(b.s==='SP') return scale * Math.max(-3, Math.min(4, urgOf('sp')));
   if(b.s==='LB') return scale * (b.w==='a' ? 0.5 : b.w==='k' ? 0.2 : 0.05);
@@ -256,11 +257,12 @@ function budgetLine() {
 
 // ── Spørgsmål ────────────────────────────────────────────────────────────────
 const T = (b, ...tags) => tags.some(t => b.g.includes(t));
+const HEAVY = ['dark','sad','depressing','depression','death / grief','grief','suicide / ideation','self harm','abuse','tragic','horror'];
 const SPORT = ['sports','hockey','football','tennis','basketball','baseball','swimming'];
 const QS = [
   {id:'q1', title:'Hvilken tone har du lyst til?', sub:'Kun stemningen — genren kommer bagefter.', multi:false, skip:'any', chip:'Tone', skipTxt:'alle toner',
    opts:[
-    {v:'light', e:'☀️', l:'Let & sjov', d:'Fluffy, sjov og feel-good', f:b=>T(b,'funny','lighthearted','hopeful')},
+    {v:'light', e:'☀️', l:'Let & sjov', d:'Fluffy, sjov og feel-good', f:b=>T(b,'funny','lighthearted','hopeful')&&!T(b,...HEAVY)},
     {v:'emotional', e:'💔', l:'Dyb & følelsesladet', d:'Angst, tårer og den gode smerte', f:b=>T(b,'emotional','angst','sad')},
     {v:'dark', e:'🌑', l:'Mørk & intens', d:'Spændende, dyster og anspændt', f:b=>T(b,'dark','tense','thriller','mystery','suspense','dark romance')}]},
   {id:'q2', title:'Hvilken plot-dynamik tiltrækker dig?', sub:'Vælg op til 3.', multi:true, max:3, skip:['any_trope'], chip:'Dynamik', skipTxt:'alle dynamikker',
@@ -277,7 +279,7 @@ const QS = [
     {v:'contemporary', e:'🏙️', l:'Moderne virkelighed', d:'Nutidens verden', f:b=>T(b,'contemporary')},
     {v:'fantasy', e:'🐉', l:'Fantasy & magi', d:'Overnaturlig, fae, paranormal', f:b=>T(b,'fantasy','magic','paranormal','fae','high fantasy')},
     {v:'historical', e:'🏰', l:'Historisk', d:'Regency, viktoriansk, fortiden', f:b=>T(b,'historical','regency')},
-    {v:'thriller', e:'🔪', l:'Thriller & krimi', d:'Mystery og suspense', f:b=>T(b,'thriller','mystery','suspense','dark')},
+    {v:'thriller', e:'🔪', l:'Thriller & krimi', d:'Mystery og suspense', f:b=>T(b,'thriller','mystery','suspense')},
     {v:'sports', e:'🏒', l:'Sports romance', d:'Hockey, fodbold, tennis …', f:b=>T(b,...SPORT)}]},
   {id:'q4', title:'Hvor meget spice skal der være?', sub:'Romance.io spice-skala 1–5. Bøger uden data tæller med.', multi:false, skip:'any_spice', chip:'Spice', skipTxt:'alle niveauer',
    opts:[
@@ -381,7 +383,7 @@ function scoreBook(book) {
   const tags = book.g;
   const has = (...t) => t.some(tag => tags.includes(tag));
   const mood = answers.q1;
-  if (mood==='light')     { if(has('funny','lighthearted'))score+=3; if(has('hopeful'))score+=1; if(has('dark','tense','angst'))score-=2; }
+  if (mood==='light')     { if(has('funny','lighthearted'))score+=3; if(has('hopeful'))score+=1; if(has('tense','angst'))score-=2; if(has(...HEAVY))score-=4; }
   if (mood==='emotional') { if(has('emotional','angst'))score+=3; if(has('sad','hopeful'))score+=1; if(has('lighthearted','funny'))score-=1; }
   if (mood==='dark')      { if(has('dark','tense','thriller','mystery','suspense','dark romance'))score+=3; if(has('possessive hero','alpha male'))score+=1; if(has('lighthearted','funny'))score-=2; }
   const tropes = answers.q2;
@@ -393,7 +395,7 @@ function scoreBook(book) {
   if(genre==='contemporary'&& has('contemporary'))score+=3;
   else if(genre==='fantasy'  && has('fantasy','magic','paranormal','fae','high fantasy'))score+=4;
   else if(genre==='historical'&&has('historical','regency'))score+=4;
-  else if(genre==='thriller' && has('thriller','mystery','suspense','dark'))score+=3;
+  else if(genre==='thriller' && has('thriller','mystery','suspense'))score+=3;
   else if(genre==='sports'   && has(...SPORT))score+=4;
   else if(genre && genre!=='any_genre') score-=2;
   const spice = answers.q4;
@@ -419,8 +421,13 @@ function matchTxt(b) {
 
 // ── Resultater ───────────────────────────────────────────────────────────────
 const PAGE_SIZE = 8;
-let _scored = [], _shown = 0;
-const listenable = b => b.s !== '–' && !(b.s === 'LB' && b.w === 'l');
+let _scored = [], _shown = 0, _nHit = 0;
+const estH = b => b.h || (b.p ? b.p/30 : (BUDGET.avgBookHours || 12.5));
+// Passer i timerne tilbage på BookBeat/Spotify (ukendt længde skønnes, tæller aldrig som 'passer' af sig selv)
+const fits = b => { const k = b.s==='BB'?'bb':(b.s==='SP'?'sp':null); if(!k) return true; const r = remHours(k); return r==null || estH(b) <= r + 0.25; };
+const startable = b => b.st !== 0;
+const listenable = b => b.s !== '–' && !(b.s === 'LB' && b.w === 'l') && fits(b) && startable(b);
+const matchesAll = b => QS.every((_, k) => qFilter(k)(b));
 
 function statusOf(b) {
   if (b.s === 'LB') {
@@ -466,13 +473,18 @@ function showResults() {
 function resort() {
   const pool = onlyAvail ? BOOKS.filter(listenable) : BOOKS;
   _freeFirst = freeFirst;
-  _scored = pool.map(b => ({...b, score: scoreBook(b) + srcBonus(b)})).sort((a, b) => b.score - a.score || b.r - a.r);
+  const sc = b => ({...b, score: scoreBook(b) + srcBonus(b) - (startable(b) ? 0 : 3)});
+  const byScore = (a, b) => b.score - a.score || b.r - a.r;
+  const hit = pool.filter(matchesAll).map(sc).sort(byScore);
+  const near = pool.filter(b => !matchesAll(b)).map(sc).filter(b => b.score > 0).sort(byScore).map(b => ({...b, near: true}));
+  _nHit = hit.length;
+  _scored = hit.concat(near);
   _shown = 0;
   $('chips').innerHTML = chipsHTML();
   $('tgAvail').setAttribute('aria-pressed', onlyAvail);
   $('tgFree').setAttribute('aria-pressed', freeFirst);
   const bl = budgetLine();
-  $('rsub').textContent = `Vurderet ud fra ${pool.length} bøger` + (freeFirst && bl ? ' · ' + bl : '');
+  $('rsub').textContent = `${_nHit} af ${pool.length} bøger matcher alle dine svar` + (freeFirst && bl ? ' · ' + bl : '');
   $('book-list').innerHTML = '';
   if (!_scored.length) {
     $('book-list').innerHTML = '<div class="none">Ingen bøger matcher alle svar. Prøv at slå “Kun dem jeg kan lytte til nu” fra eller ret et svar ovenfor.</div>';
@@ -484,7 +496,11 @@ function resort() {
 
 function more() {
   const batch = _scored.slice(_shown, _shown + PAGE_SIZE);
-  $('book-list').insertAdjacentHTML('beforeend', batch.map((b, i) => card(b, _shown + i)).join(''));
+  $('book-list').insertAdjacentHTML('beforeend', batch.map((b, i) => {
+    const k = _shown + i;
+    const div = (k === _nHit) ? `<div class="none" style="margin:14px 0 6px">${_nHit ? 'Tæt på: disse matcher ikke alle dine svar' : 'Ingen bøger matcher alle dine svar. Her er de nærmeste'}</div>` : '';
+    return div + card(b, k);
+  }).join(''));
   _shown += batch.length;
   const btn = $('more'), rem = _scored.length - _shown;
   if (rem > 0) { btn.textContent = `Vis ${Math.min(PAGE_SIZE, rem)} flere (${rem} tilbage)`; btn.style.display = ''; }
@@ -542,8 +558,31 @@ def load_budget():
             b = {}
     return b
 
+def enrich(books):
+    """Brug samme rensede data som Up Next: tags (renset i build_rec_data.py), blended rating,
+    lydbogstimer og om bogen kan startes (ikke #2+ i en serie hun ikke er i gang med)."""
+    base = os.path.dirname(__file__)
+    def _load(name, default):
+        try: return json.load(open(os.path.join(base, name), encoding='utf-8'))
+        except Exception: return default
+    rec = {b['id']: b for b in _load('.rec_full.json', [])}
+    audio = _load('.ae.json', {}).get('audio', {})
+    cont = _load('.continue.json', {})
+    for b in books:
+        try: bid = int(b['id'])
+        except Exception: continue
+        rb = rec.get(bid)
+        if rb:
+            if rb.get('tags'): b['g'] = [t.strip() for t in rb['tags'].split(',') if t.strip()]
+            if rb.get('rating'): b['r'] = round(rb['rating'], 2)
+            b['p'] = rb.get('pages')
+            sn = rb.get('snum')
+            b['st'] = 0 if (sn and sn > 1 and str(bid) not in cont) else 1
+        b['h'] = audio.get(str(bid))
+    return books
+
 def generate():
-    books = build_data()
+    books = enrich(build_data())
     data_js = json.dumps(books, ensure_ascii=False, separators=(',',':'))
     html = HTML_TEMPLATE.replace('BOOKS_DATA_PLACEHOLDER', data_js)
     html = html.replace('BUDGET_DATA_PLACEHOLDER', json.dumps(load_budget(), ensure_ascii=False))
