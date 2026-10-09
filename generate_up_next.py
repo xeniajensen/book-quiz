@@ -70,10 +70,16 @@ if os.path.exists('.budget.json'):
             BUDGET['bb']['daysLeft'] = max(0, d)
     except Exception: BUDGET = {}
 
+# Personlige teasers (skrevet af Claude ud fra beskrivelse + Xenias ratings), id -> tekst
+TEASERS = {}
+if os.path.exists('.teasers.json'):
+    try: TEASERS = json.load(open('.teasers.json'))
+    except Exception: TEASERS = {}
+
 slim = [{"i": b["id"], "t": b["title"], "a": b["author"], "s": b["source"], "av": b["avail"],
          "r": round(b["rating"], 2) if b["rating"] else None, "hrs": b["hrs"], "p": b.get("pages"),
          "sp": b["spice"], "se": b["series"], "sn": b["snum"], "d": b["dateAdded"], "lb": b["libby"],
-         "rd": b["readers"], "tg": b["tags"], "sl": b["slug"]} for b in data]
+         "rd": b["readers"], "tg": b["tags"], "sl": b["slug"], "tz": TEASERS.get(str(b["id"]), "")} for b in data]
 PAYLOAD = json.dumps({"books": slim, "recent": RECENT, "baked": BAKED, "bakedOpp": BAKED_OPP, "cont": CONT, "worker": WORKER, "list": ALL_TBR_LIST, "upnext": UP_NEXT_LIST, "budget": BUDGET}, ensure_ascii=False)
 
 HTML = r'''<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -119,6 +125,9 @@ a{color:inherit}
 .bt a{text-decoration:none}.bt a:hover{text-decoration:underline}
 .au{color:var(--ink2);font-size:13px;margin-bottom:6px}
 .why{font-size:14px;color:var(--ink);line-height:1.5}
+.rsn{font-size:12.5px;color:var(--ink2);line-height:1.45;margin-top:6px}
+.rsn::before{content:"Hvorfor nu: ";font-weight:600}
+.hero .rsn{font-size:13px}
 .upnextwrap .why{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
 .meta{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-top:9px;font-size:13px;color:var(--ink2)}
 .star{color:var(--ink);font-weight:600}
@@ -375,11 +384,12 @@ function cover(b,cls){const u=COV[b.i];
   return `<div class="${pc}" style="background:hsl(${h} 38% 86%)">${cls==='rcov'?'':(t.length>38?t.slice(0,36)+'…':t)}</div>`;}
 const readBtn=b=>`<button type="button" class="btn readbtn" data-id="${b.i}">Læs nu</button>`;
 function metaLine(b){return `${b.r!=null?`<span class="star">★ ${b.r.toFixed(2).replace('.',',')}</span>`:''}${stHTML(b)}${b.hrs?`<span>${hrsTxt(b)}</span>`:''}${srcTxt(b)?`<span>${srcTxt(b)}</span>`:''}${b.sp?`<span>🌶 ${b.sp}</span>`:''}`;}
-function card(label,b,why,cyc,ai,note){return `<div class="card">${cover(b,'cov')}<div class="body">
+const escT=t=>String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function card(label,b,why,cyc,ai,note,rsn){return `<div class="card">${cover(b,'cov')}<div class="body">
   <div class="lblrow"><span class="lbl">${label}${note?` <span class="note">· ${note}</span>`:''}</span></div>
   <div class="bt">${link(b)}</div>
   <div class="au">${b.a||''}${b.se?` · ${b.se}${b.sn?(' #'+b.sn):''}`:''}</div>
-  <div class="why">${why||''}</div>
+  <div class="why">${why||''}</div>${rsn?`<div class="rsn">${rsn}</div>`:''}
   <div class="meta">${metaLine(b)}</div>
   <div class="acts">${readBtn(b)}${cyc||''}</div>
 </div></div>`;}
@@ -398,7 +408,7 @@ function renderPicks(){
  PICKS.forEach(p=>{const pool=p.pool().filter(srcOK);if(!pool.length)return;
    if(idx[p.k]==null)idx[p.k]=Math.floor(Math.random()*pool.length);
    const b=pool[Math.min(idx[p.k],pool.length-1)];
-   const el=document.createElement('div');el.innerHTML=card(p.lb,b,p.why(b),`<button type="button" class="btn ghost cyc" data-k="${p.k}">↻ Træk ny</button>`,false,p.note||'');host.appendChild(el.firstChild);});
+   const el=document.createElement('div');el.innerHTML=card(p.lb,b,b.tz?escT(b.tz):p.why(b),`<button type="button" class="btn ghost cyc" data-k="${p.k}">↻ Træk ny</button>`,false,p.note||'',b.tz?p.why(b):'');host.appendChild(el.firstChild);});
  const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
  const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
  host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool().filter(srcOK);
@@ -474,6 +484,7 @@ async function loadNextInSeries(){
 // Beskrivelse til Up Next-kort: Hardcover-synopsis hvis workeren leverer den, ellers bygget af tags/serie/vurdering.
 function upWhy(b,x){
  const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+ if(b.tz)return esc(b.tz);
  let d=(x&&x.desc)?String(x.desc).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim():'';
  if(d){if(d.length>240)d=d.slice(0,240).replace(/\s+\S*$/,'')+'…';return esc(d);}
  const bits=[];
@@ -517,7 +528,7 @@ function renderNext(){
    <div class="hlbl">${label}</div>
    <div class="htitle">${link(b)}</div>
    <div class="hau">${b.a||''}${b.se?` · ${b.se}${b.sn?(' #'+b.sn):''}`:''}</div>
-   <div class="hwhy">${why}</div>
+   <div class="hwhy">${b.tz?escT(b.tz):why}</div>${b.tz?`<div class="rsn">${why}</div>`:''}
    <div class="meta">${b.s?metaLine(b):'<span>Ikke på din TBR endnu</span>'}</div>
    <div class="acts">${readBtn(b)}${cyc}</div>
  </div></div>`;

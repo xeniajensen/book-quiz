@@ -129,7 +129,7 @@ const BOOKS = [{"t":"The Drowning Woman","a":"Robyn Harding","s":"SP","g":["fict
 // fælles lyttetempo, så den største bunke er ikke altid den rigtige at jage:
 // udløber en mindre bunke først, dør den mens man jager den store. Kun de
 // timer hun realistisk NÅR at bruge (atRisk) tæller — resten er tabt uanset.
-const BUDGET = {"fetched": "2026-10-08", "bb": {"used": 0, "limit": 50, "periodEnd": "2026-11-05", "subscriptionType": "standard", "daysLeft": 28}, "sp": {"used": 10, "limit": 12, "daysLeft": 24}, "libby": {"quotaPerMonth": 3, "note": "Koebenhavn/eReolen Global - verificer i appen under Min side > Laan"}, "avgBookHours": 12.5, "dailyCapacity": 2.0, "dailyCapacityNote": "Realistisk lyttetempo i t/dag. Afledt af BookBeat-forbrug i indevaerende periode (34,1 t / 19 dage = 1,8 t/dag) og rundet op. Er et gulv - taeller ikke Spotify/Libby/ejet. Juster hvis tempoet aendrer sig; generatorerne falder tilbage til 2.0 hvis feltet mangler."};
+const BUDGET = {"fetched": "2026-10-09", "bb": {"used": 0, "limit": 50, "periodEnd": "2026-11-05", "subscriptionType": "standard", "daysLeft": 27}, "sp": {"used": 10, "limit": 12, "daysLeft": 23}, "libby": {"quotaPerMonth": 3, "note": "Koebenhavn/eReolen Global - verificer i appen under Min side > Laan"}, "avgBookHours": 12.5, "dailyCapacity": 2.0, "dailyCapacityNote": "Realistisk lyttetempo i t/dag. Afledt af BookBeat-forbrug i indevaerende periode (34,1 t / 19 dage = 1,8 t/dag) og rundet op. Er et gulv - taeller ikke Spotify/Libby/ejet. Juster hvis tempoet aendrer sig; generatorerne falder tilbage til 2.0 hvis feltet mangler."};
 const CAP = (+BUDGET.dailyCapacity > 0) ? +BUDGET.dailyCapacity : 2.0;  // t/dag
 function remHours(k) {
   const o = BUDGET[k]; if(!o) return null;
