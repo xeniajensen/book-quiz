@@ -255,14 +255,14 @@ const SRCS=['BookBeat','Spotify','Libby','Ejet','Ingen'];
 let SRCSEL=new Set(SRCS);
 try{const sv=JSON.parse(localStorage.getItem('un_src')||'null');if(Array.isArray(sv)){const f=sv.filter(x=>SRCS.includes(x));if(f.length)SRCSEL=new Set(f);}}catch(e){}
 const srcOK=b=>SRCSEL.has(srcGroup(b));
-const F={now:false,free:false,fit:false,deep:false,series:false,rate:0,spice:0,maxh:30,sort:'useit',txt:''};
+const F={now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,maxh:30,sort:'useit',txt:''};
 const fmt=n=>String(Math.round(n*10)/10).replace('.',',');
-function remFor(k){const o=k==='BookBeat'?BUD.bb:(k==='Spotify'?BUD.sp:null);return o?Math.max(0,Math.round(((o.limit||0)-(o.used||0))*10)/10):null;}
+function remFor(k){const o=k==='BookBeat'?BUD.bb:(k==='Spotify'?BUD.sp:null);if(!o)return null;const rem=Math.max(0,(o.limit||0)-(o.used||0));const dd=Number.isFinite(+o.daysLeft)&&+o.daysLeft>=0?Math.max(1,+o.daysLeft):30;const reachable=Math.min(rem,(+BUD.dailyCapacity>0?+BUD.dailyCapacity:2.0)*dd);return Math.round(reachable*10)/10;}  // timer hun reelt NAAR foer fornyelse
 // Passer i mine timer: BookBeat/Spotify-bøger må ikke være længere end timerne tilbage på netop den kilde.
 // Ejede bøger og Libby er ikke begrænset af et timebudget.
 // Ukendt længde skaetzes (sider/30 eller gennemsnit) - aldrig 'passer' bare fordi tallet mangler.
 const estHrs=b=>b.hrs||(b.p?b.p/30:(BUD.avgBookHours||12.5));
-const fitsOwn=b=>{const r=(b.s==='BookBeat'||b.s==='Spotify')?remFor(b.s):null;return r==null||estHrs(b)<=r+0.25;};
+const fitsOwn=b=>{const r=(b.s==='BookBeat'||b.s==='Spotify')?remFor(b.s):null;return r==null||estHrs(b)<=r+0.1;};
 function mkTg(label,pressed,fn){const x=document.createElement('button');x.type='button';x.className='tg';x.setAttribute('aria-pressed',pressed?'true':'false');x.textContent=label;x.onclick=fn;return x;}
 function renderSrcFilter(){const h=document.getElementById('fSrc');if(!h)return;h.innerHTML='';const all=SRCSEL.size===SRCS.length;
   h.appendChild(mkTg('Alle',all,()=>{SRCSEL=new Set(SRCS);saveSrc();}));
@@ -276,7 +276,7 @@ const costPill=b=>{const c=costTier(b);return costLabel[c]?`<span class="badge c
 const freeNow=b=>costTier(b)==='owned'||(b.s==='Libby'&&b.av==='now');
 // Spotify har kun få timer tilbage: en bog der er længere end resten kan ikke nås i denne periode.
 const spLeft=()=>BUD.sp?Math.max(0,(BUD.sp.limit||0)-(BUD.sp.used||0)):null;
-const spFits=b=>{if(b.s!=='Spotify')return true;const r=spLeft();return r==null||estHrs(b)<=r+0.25;};
+const spFits=b=>b.s!=='Spotify'||fitsOwn(b);
 const lbDays=b=>{const m=/(\d+)\s*dage/.exec(b.lb||'');return m?+m[1]:0;};
 
 // ── Budget: brug-det-eller-mist-det ──────────────────────────────────────────
@@ -313,7 +313,7 @@ const urg=src=>{
 // hastesag (laanekvoten nulstilles ogsaa). Ejet = 0 (aldrig spildt).
 const urgency=b=>{
   const c=costTier(b);
-  if(c==='paid') return urg('BookBeat');
+  if(c==='paid') return fitsOwn(b)?urg('BookBeat'):-5;   // passer ikke i de resterende timer
   if(c==='inc')  return spFits(b)?urg('Spotify'):-5;   // passer ikke i de resterende timer
   if(c==='lib')  return b.av==='now'?0.5:(b.av==='short'?0.2:0.05);
   if(c==='owned')return 0;
@@ -351,7 +351,7 @@ function budgetBanner(){
 const PICKS=[
  {k:'useit',lb:'Brug dine betalte timer',pool:()=>{const order=['BookBeat','Spotify'].sort((a,b)=>urg(b)-urg(a));
    for(const best of order){if(urg(best)<=0)continue;
-     const pl=DATA.filter(b=>b.s===best&&b.r&&b.r>=3.4&&startable(b)&&spFits(b)&&srcOK(b));
+     const pl=DATA.filter(b=>b.s===best&&b.r&&b.r>=3.4&&startable(b)&&fitsOwn(b)&&srcOK(b));
      if(pl.length)return pl;}
    return [];},
   why:b=>{const bd=b.s==='BookBeat'?BUD.bb:BUD.sp;const rem=bd?((bd.limit||0)-(bd.used||0)):null;
@@ -563,7 +563,7 @@ function syncUI(){
  document.getElementById('fhVal').textContent=F.fit?'låst til dit budget':(F.maxh>=30?'alle':('≤ '+F.maxh+' t'));
  document.getElementById('fitHint').textContent=F.fit?`Låst, mens "Passer i mine timer" er slået til: BookBeat ${r1!=null?fmt(r1):'–'} t, Spotify ${r2!=null?fmt(r2):'–'} t. Ejede bøger og Libby er ikke begrænset.`:'';
 }
-function resetAll(){Object.assign(F,{now:false,free:false,fit:false,deep:false,series:false,rate:0,spice:0,maxh:30,txt:''});document.getElementById('fText').value='';document.getElementById('fHours').value=30;SRCSEL=new Set(SRCS);try{localStorage.removeItem('un_src');}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
+function resetAll(){Object.assign(F,{now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,maxh:30,txt:''});document.getElementById('fText').value='';document.getElementById('fHours').value=30;SRCSEL=new Set(SRCS);try{localStorage.removeItem('un_src');}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
 function update(){
  F.txt=fText.value.trim().toLowerCase(); F.maxh=+fHours.value;
  let rows=DATA.filter(b=>{
