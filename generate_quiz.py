@@ -243,12 +243,16 @@ function budgetLine() {
   const bits=[];
   if(bb) bits.push(`BookBeat ${bb.used||0}/${bb.limit} t${bb.daysLeft!=null?` · ${bb.daysLeft} dg tilbage`:''}`);
   if(sp) bits.push(`Spotify ${sp.used||0}/${sp.limit} t${sp.daysLeft!=null?` · ${sp.daysLeft} dg tilbage`:''}`);
-  const ub=urgOf('bb'), us=urgOf('sp');
+  // Som Up Next: kun en kilde med brugbare boeger kan anbefales
+  const usable = k => BOOKS.some(b => b.s===(k==='bb'?'BB':'SP') && b.r>=3.4 && startable(b) && fits(b));
+  const ub = (bb && usable('bb')) ? urgOf('bb') : -1, us = (sp && usable('sp')) ? urgOf('sp') : -1;
   const best = ub>=us ? 'bb' : 'sp';
   const bu = Math.max(ub, us);
+  const anyRem = (bb && remHours('bb')>0) || (sp && remHours('sp')>0);
   const lvl = Math.max(rawUrgOf('bb'), rawUrgOf('sp'));   // er der overskud?
   const bd = (BUDGET[best]||{}).daysLeft;
-  const rec = bu<=0 ? 'alle betalte timer brugt → gratis kilder først'
+  const rec = bu<=0 ? (anyRem ? 'ingen gode bøger passer i de betalte timer tilbage → gratis kilder først' : 'alle betalte timer brugt → gratis kilder først')
+            : smallLeft(best) ? `kun ${String(reachR(best)).replace('.',',')} t tilbage på ${best==='bb'?'BookBeat':'Spotify'} → højst ${FILL.size||2} bøger der fylder dem op, ellers gratis/ejet/Libby`
             : lvl<0.5 ? 'kun lidt betalt tid tilbage → bland med Libby'
             : `brug ${best==='bb'?'BookBeat':'Spotify'} først${bd!=null?` (fornyes om ${bd} dg)`:''}`;
   return `${bits.join(' · ')} · ${rec}`;
@@ -424,7 +428,15 @@ const PAGE_SIZE = 8;
 let _scored = [], _shown = 0, _nHit = 0;
 const estH = b => b.h || (b.p ? b.p/30 : (BUDGET.avgBookHours || 12.5));
 // Passer i timerne tilbage på BookBeat/Spotify (ukendt længde skønnes, tæller aldrig som 'passer' af sig selv)
-const fits = b => { const k = b.s==='BB'?'bb':(b.s==='SP'?'sp':null); if(!k) return true; const r = remHours(k); return r==null || estH(b) <= r + 0.25; };
+// Samme regler som Up Next (budget_rules.py): timer tilbage = min(rest, tempo x dage).
+// Under en standardbog passer kun de faa udvalgte fyld-boeger; ellers skal laengden passe.
+const STD = (+BUDGET.std > 0) ? +BUDGET.std : 12.5;
+const TOL = (+BUDGET.tol >= 0) ? +BUDGET.tol : 0.1;
+const FILL = new Set([...((BUDGET.fill||{}).bb||[]), ...((BUDGET.fill||{}).sp||[])].map(Number));
+const reachR = k => Math.round(reachableHours(k)*10)/10;
+const smallLeft = k => !!BUDGET[k] && reachR(k) < STD;
+const fits = b => { const k = b.s==='BB'?'bb':(b.s==='SP'?'sp':null); if(!k || !BUDGET[k]) return true;
+  return smallLeft(k) ? FILL.has(+b.id) : estH(b) <= reachR(k) + TOL; };
 const startable = b => b.st !== 0;
 const listenable = b => b.s !== '–' && !(b.s === 'LB' && b.w === 'l') && fits(b) && startable(b);
 const matchesAll = b => QS.every((_, k) => qFilter(k)(b));
@@ -585,7 +597,8 @@ def generate():
     books = enrich(build_data())
     data_js = json.dumps(books, ensure_ascii=False, separators=(',',':'))
     html = HTML_TEMPLATE.replace('BOOKS_DATA_PLACEHOLDER', data_js)
-    html = html.replace('BUDGET_DATA_PLACEHOLDER', json.dumps(load_budget(), ensure_ascii=False))
+    from budget_rules import budget_payload   # faelles regler med Up Next
+    html = html.replace('BUDGET_DATA_PLACEHOLDER', json.dumps(budget_payload(), ensure_ascii=False))
     with open(OUT_PATH, 'w', encoding='utf-8') as f:
         f.write(html)
     print(f"Quiz genereret: {len(books)} bøger → {OUT_PATH}")

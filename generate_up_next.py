@@ -59,16 +59,9 @@ if os.path.exists('.continue.json'):
 
 # Abonnements-budget (timer brugt/tilbage). Skrives af pipelinen fra BookBeat +
 # Spotify. Mangler filen, falder siden tilbage til ren pris-prioritering.
-BUDGET = {}
-if os.path.exists('.budget.json'):
-    try:
-        BUDGET = json.load(open('.budget.json'))
-        # dage tilbage af BookBeat-perioden udregnes friskt ved hver build
-        pe = (BUDGET.get('bb') or {}).get('periodEnd')
-        if pe:
-            d = (datetime.date.fromisoformat(pe) - datetime.date.today()).days
-            BUDGET['bb']['daysLeft'] = max(0, d)
-    except Exception: BUDGET = {}
+# Budget + fyld-boeger fra den faelles regel-modul (samme som quizzen)
+from budget_rules import budget_payload
+BUDGET = budget_payload()
 
 # Personlige teasers (skrevet af Claude ud fra beskrivelse + Xenias ratings), id -> tekst
 TEASERS = {}
@@ -80,7 +73,7 @@ slim = [{"i": b["id"], "t": b["title"], "a": b["author"], "s": b["source"], "av"
          "r": round(b["rating"], 2) if b["rating"] else None, "hrs": b["hrs"], "p": b.get("pages"),
          "sp": b["spice"], "se": b["series"], "sn": b["snum"], "d": b["dateAdded"], "lb": b["libby"],
          "rd": b["readers"], "tg": b["tags"], "sl": b["slug"], "tz": TEASERS.get(str(b["id"]), "")} for b in data]
-PAYLOAD = json.dumps({"books": slim, "recent": RECENT, "baked": BAKED, "bakedOpp": BAKED_OPP, "cont": CONT, "worker": WORKER, "list": ALL_TBR_LIST, "upnext": UP_NEXT_LIST, "budget": BUDGET}, ensure_ascii=False)
+PAYLOAD = json.dumps({"books": slim, "recent": RECENT, "baked": BAKED, "bakedOpp": BAKED_OPP, "cont": CONT, "worker": WORKER, "list": ALL_TBR_LIST, "upnext": UP_NEXT_LIST, "budget": BUDGET, "built": datetime.date.today().isoformat()}, ensure_ascii=False)
 
 HTML = r'''<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Up Next — from your TBR</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet"><style>
@@ -262,18 +255,16 @@ function remFor(k){const o=k==='BookBeat'?BUD.bb:(k==='Spotify'?BUD.sp:null);if(
 // Ejede bøger og Libby er ikke begrænset af et timebudget.
 // Ukendt længde skaetzes (sider/30 eller gennemsnit) - aldrig 'passer' bare fordi tallet mangler.
 const estHrs=b=>b.hrs||(b.p?b.p/30:(BUD.avgBookHours||12.5));
-const baseFit=b=>{const r=(b.s==='BookBeat'||b.s==='Spotify')?remFor(b.s):null;return r==null||estHrs(b)<=r+0.1;};
+const baseFit=b=>{const r=(b.s==='BookBeat'||b.s==='Spotify')?remFor(b.s):null;return r==null||estHrs(b)<=r+TOL;};
 // Nedre graense: er timerne tilbage under en standard-bog (avgBookHours), er der ikke plads til et rigtigt
 // valg paa den betalte kilde. Saa foreslaas hoejst 2 bøger der (næsten) fylder resten op - kun med kendt laengde -
 // og alt andet peger paa gratis/ejet/Libby. Er der mere end en standard-bog tilbage, gaelder det normale fit-tjek.
-const STD=(+((P.budget||{}).avgBookHours)>0)?+P.budget.avgBookHours:12.5;   // BUD er endnu ikke erklaeret her (TDZ)
-const FILL_MAX=2, FILL_MIN_RATING=3.4;
+// Fyld-boeger og standardlaengde udregnes i budget_rules.py (faelles med quizzen), saa begge sider foreslaar det samme.
+const STD=(+((P.budget||{}).std)>0)?+P.budget.std:12.5;   // BUD er endnu ikke erklaeret her (TDZ)
+const TOL=(+((P.budget||{}).tol)>=0)?+P.budget.tol:0.1;
+const FILL_MAX=Math.max(1,...[0,...Object.values((P.budget||{}).fill||{}).map(a=>a.length)]);
 let _fill=null;
-function fillSet(){if(_fill)return _fill;_fill=new Set();
-  ['BookBeat','Spotify'].forEach(src=>{const r=remFor(src);if(r==null||r>=STD||r<1)return;
-    DATA.filter(b=>b.s===src&&b.hrs&&b.hrs<=r+0.1&&b.r&&b.r>=FILL_MIN_RATING&&startable(b)&&(b.av==='now'||b.av==='short'))
-      .sort((a,b)=>(b.hrs-a.hrs)||(b.r-a.r)).slice(0,FILL_MAX).forEach(b=>_fill.add(b.i));});
-  return _fill;}
+function fillSet(){if(_fill)return _fill;const f=(P.budget||{}).fill||{};_fill=new Set([...(f.bb||[]),...(f.sp||[])]);return _fill;}
 const smallLeft=src=>{const r=remFor(src);return r!=null&&r<STD;};
 const fitsOwn=b=>{if(b.s!=='BookBeat'&&b.s!=='Spotify')return true;return smallLeft(b.s)?fillSet().has(b.i):baseFit(b);};
 function mkTg(label,pressed,fn){const x=document.createElement('button');x.type='button';x.className='tg';x.setAttribute('aria-pressed',pressed?'true':'false');x.textContent=label;x.onclick=fn;return x;}
@@ -332,6 +323,15 @@ const urgency=b=>{
   if(c==='owned')return 0;
   return -50;
 };
+// Er der en klar "brug denne kilde"? Samme regler som banneret: en kilde med brugbare bøger
+// OG mindst 0,5 t/dag i overskud OG ikke i fyld-tilstand (under en standardbog).
+function budgetState(){let push=null,pushU=-1,levelU=-99,anyRem=false;
+  [['BookBeat',BUD.bb],['Spotify',BUD.sp]].forEach(([k,o])=>{if(!o)return;const rem=(o.limit||0)-(o.used||0),d=dl(o.daysLeft),u=urg(k);
+    if(rem>0)anyRem=true;
+    const usable=DATA.some(b=>b.s===k&&b.r&&b.r>=3.4&&startable(b)&&fitsOwn(b));
+    if(usable&&u>pushU){pushU=u;push=k;}
+    levelU=Math.max(levelU,rawUrg(rem,d));});
+  return {push,pushU,levelU,anyRem,clear:pushU>0&&levelU>=0.5&&!smallLeft(push)};}
 function budgetBanner(){
   if(!BUD.bb&&!BUD.sp) return '';
   const parts=[]; let push=null, pushU=-1, levelU=-99, pushDays=0;
@@ -351,8 +351,9 @@ function budgetBanner(){
     parts.push(`<span style="color:#9a3412">Loftet falder til ${BUD.bb.nextLimit} t fra ${BUD.bb.periodEnd}</span>`);
   // levelU (raa t/dag) afgoer OM der er betalt tid i overskud — samme 0.5-taerskel
   // som et ledigt Libby-laan. pushU (EDF) afgoer HVILKEN kilde der naevnes.
+  const anyRem=budgetState().anyRem;
   const rec = pushU<=0
-    ? `Alle betalte timer er brugt — <b>gå efter gratis kilder</b> (ejet + Libby) resten af perioden.`
+    ? (anyRem?`Ingen gode bøger passer i de betalte timer der er tilbage — <b>gå efter gratis kilder</b> (ejet + Libby).`:`Alle betalte timer er brugt — <b>gå efter gratis kilder</b> (ejet + Libby) resten af perioden.`)
     : levelU<0.5
       ? (smallLeft(push)?`Kun ${fmt(remFor(push))} t tilbage på ${push}, mindre end en gennemsnitsbog. Jeg viser højst ${FILL_MAX} bøger der fylder dem op; resten af forslagene er <b>gratis, ejede og Libby</b>.`:`Kun lidt betalt tid tilbage på ${push} — <b>bland</b>: tag den med, men et ledigt Libby-lån er lige så presserende.`)
       : `Du har betalte timer i overskud — <b>brug ${push} først</b>: den fornyes om ${pushDays} dage, så dens timer dør før de andres. Gem de ejede bøger til bufferen.`;
@@ -406,30 +407,29 @@ function card(label,b,why,cyc,ai,note,rsn){return `<div class="card">${cover(b,'
   <div class="meta">${metaLine(b)}</div>
   <div class="acts">${readBtn(b)}${cyc||''}</div>
 </div></div>`;}
+// Hver bog vises hoejst eet sted: Up Next-listen, Naeste bog, og saa kortene i raekkefoelge.
+// CH husker hvilken bog hvert kort viser, saa et kort kun skifter naar dets bog bliver taget af et tidligere kort.
+const CH={};
+const upIds=()=>new Set((window._upnext||[]).map(x=>x.id));
+function choose(key,pool){if(!pool.length){delete CH[key];return null;}let b=pool.find(x=>x.i===CH[key]);if(!b){b=pool[Math.floor(Math.random()*pool.length)];CH[key]=b.i;}return b;}
+function reroll(key,pool){const alt=(pool||[]).filter(x=>x.i!==CH[key]);if(alt.length)CH[key]=alt[Math.floor(Math.random()*alt.length)].i;}
+const cycBtn=(k,n)=>n>1?`<button type="button" class="btn ghost cyc" data-k="${k}">↻ Træk ny</button>`:'';
+function aiPool(src){return (src&&src.picks?src.picks:[]).filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id])).map(pk=>Object.assign({},byId[pk.id],{_rsn:pk.reason||''}));}
 function renderPicks(){
- const host=document.getElementById('picks');host.innerHTML='';
- const ml=window._ml;
- if(ml&&ml.picks){const list=ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));
-   if(list.length){ if(window._mlIdx==null)window._mlIdx=Math.floor(Math.random()*list.length);
-     const pk=list[window._mlIdx%list.length];
-     const el=document.createElement('div');el.innerHTML=card('Din stemning',byId[pk.id],pk.reason||'',list.length>1?'<button type="button" class="btn ghost cyc" id="mlcyc">↻ Træk ny</button>':'',true,'ud fra dine seneste læsninger');host.appendChild(el.firstChild);}}
- const opp=window._opp;
- if(opp&&opp.picks){const list=opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));
-   if(list.length){ if(window._oppIdx==null)window._oppIdx=Math.floor(Math.random()*list.length);
-     const pk=list[window._oppIdx%list.length];
-     const el=document.createElement('div');el.innerHTML=card('Noget helt andet',byId[pk.id],pk.reason||'',list.length>1?'<button type="button" class="btn ghost cyc" id="oppcyc">↻ Træk ny</button>':'',true,'det modsatte af dine seneste læsninger');host.appendChild(el.firstChild);}}
- PICKS.forEach(p=>{const pool=p.pool().filter(srcOK);if(!pool.length)return;
-   if(idx[p.k]==null)idx[p.k]=Math.floor(Math.random()*pool.length);
-   const b=pool[Math.min(idx[p.k],pool.length-1)];
-   const el=document.createElement('div');el.innerHTML=card(p.lb,b,b.tz?escT(b.tz):p.why(b),`<button type="button" class="btn ghost cyc" data-k="${p.k}">↻ Træk ny</button>`,false,p.note||'',b.tz?p.why(b):'');host.appendChild(el.firstChild);});
- const mb=document.getElementById('mlcyc');if(mb)mb.onclick=()=>{const list=window._ml.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));window._mlIdx=(window._mlIdx+1)%list.length;renderPicks();};
- const ob=document.getElementById('oppcyc');if(ob)ob.onclick=()=>{const list=window._opp.picks.filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id]));window._oppIdx=(window._oppIdx+1)%list.length;renderPicks();};
- host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{const p=PICKS.find(x=>x.k===btn.dataset.k);const pool=p.pool().filter(srcOK);
-   idx[p.k]=Math.floor(Math.random()*pool.length);renderPicks();});
+ const host=document.getElementById('picks');if(!host)return;
+ const used=upIds();if(window._heroShownId!=null)used.add(window._heroShownId);
+ const pools={},html=[];
+ [['ml','Din stemning',window._ml,'ud fra dine seneste læsninger'],['opp','Noget helt andet',window._opp,'det modsatte af dine seneste læsninger']].forEach(([k,lb,src,note])=>{
+   const pool=aiPool(src).filter(b=>!used.has(b.i));const b=choose(k,pool);if(!b)return;used.add(b.i);pools[k]=pool;
+   html.push(card(lb,b,b._rsn,cycBtn(k,pool.length),true,note));});
+ PICKS.forEach(p=>{const pool=p.pool().filter(srcOK).filter(b=>!used.has(b.i));const b=choose(p.k,pool);if(!b)return;used.add(b.i);pools[p.k]=pool;
+   html.push(card(p.lb,b,b.tz?escT(b.tz):p.why(b),cycBtn(p.k,pool.length),false,p.note||'',b.tz?p.why(b):''));});
+ host.innerHTML=html.join('');
+ host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{reroll(btn.dataset.k,pools[btn.dataset.k]);renderPicks();});
 }
-function applyML(vibe,picks){window._ml={vibe:vibe,picks:picks};window._mlIdx=null;
+function applyML(vibe,picks){window._ml={vibe:vibe,picks:picks};delete CH.ml;
  const v=document.getElementById('vibe');if(v)v.textContent=vibe||'';renderPicks();}
-function applyOpp(vibe,picks){window._opp={vibe:vibe,picks:picks};window._oppIdx=null;renderPicks();}
+function applyOpp(vibe,picks){window._opp={vibe:vibe,picks:picks};delete CH.opp;renderPicks();}
 document.addEventListener('click',async e=>{
  const t=e.target.closest('.readbtn');
  if(t){t.disabled=true;t.textContent='Starter…';
@@ -510,7 +510,7 @@ function upWhy(b,x){
  return bits.length?bits.join('. ')+'.':'Ligger på din Up Next-liste på Hardcover. Ingen yderligere data om bogen endnu.';
 }
 function renderUpNext(list){
- window._upnext=list; const host=document.getElementById('upnext'); if(!host)return;
+ window._upnext=list; renderNext(); const host=document.getElementById('upnext'); if(!host)return;
  if(!list||!list.length){host.innerHTML='';return;}
  list.forEach(x=>{if(x.cover)COV[x.id]=x.cover;});
  const cards=list.map(x=>{const b=byId[x.id]||{i:x.id,t:x.t,a:x.a,sl:x.hc};
@@ -519,7 +519,11 @@ function renderUpNext(list){
 }
 // Næste bog: næste i en serie du er i gang med (live fra workeren). Findes den ikke, trækkes en bog fra "Brug dine betalte timer"/"Gratis".
 function renderHero(pick){window._heroPick=pick;renderNext();}
-function nextPool(){for(const k of ['useit','free','nowait']){const p=PICKS.find(x=>x.k===k);const pool=p?p.pool().filter(srcOK):[];if(pool.length)return {pool,p};}return {pool:[],p:null};}
+// Naeste bog: er der en klar betalt kilde, kommer den foerst. Ellers blandes betalt (fyld-boegerne),
+// gratis/ejet og klar-nu i een pulje, saa helten ikke altid er en af de samme to BookBeat-boeger.
+function nextPool(){const up=upIds();const get=k=>{const p=PICKS.find(x=>x.k===k);return p?p.pool().filter(srcOK).filter(b=>!up.has(b.i)).map(b=>({b,p})):[];};
+ if(budgetState().clear){for(const k of ['useit','free','nowait']){const l=get(k);if(l.length)return l;}return [];}
+ const seen=new Set(),mix=[];['useit','free','nowait'].forEach(k=>get(k).forEach(x=>{if(!seen.has(x.b.i)){seen.add(x.b.i);mix.push(x);}}));return mix;}
 function renderNext(){
  const host=document.getElementById('serieshero'); if(!host)return;
  const pick=window._heroPick; let b,why,label,cyc='';
@@ -532,10 +536,14 @@ function renderNext(){
    label='Næste bog · næste i din serie';
    if(!onTbr)b=Object.assign({},b,{s:null});
  } else {
-   const {pool,p}=nextPool(); if(!pool.length){host.innerHTML='';return;}
-   if(window._nextIdx==null)window._nextIdx=Math.floor(Math.random()*pool.length);
-   b=pool[window._nextIdx%pool.length]; why=p.why(b); label='Næste bog';
-   cyc='<button type="button" class="btn ghost" id="nextcyc">↻ Træk ny</button>';
+   const mix=nextPool(); const pool=mix.map(x=>x.b);
+   // Uden klar kilde: slaa plat-eller-krone mellem betalt (fyld-boegerne) og gratis/ejet, saa begge typer reelt dukker op
+   if(!budgetState().clear&&!pool.some(x=>x.i===CH.hero)){const paid=mix.filter(x=>x.p.k==='useit').map(x=>x.b),rest=mix.filter(x=>x.p.k!=='useit').map(x=>x.b);
+     const grp=(paid.length&&rest.length)?(Math.random()<0.5?paid:rest):(paid.length?paid:rest);if(grp.length)CH.hero=grp[Math.floor(Math.random()*grp.length)].i;}
+   const b0=choose('hero',pool); if(!b0){host.innerHTML='';if(window._heroShownId!=null){window._heroShownId=null;renderPicks();}return;}
+   b=b0; const src=mix.find(x=>x.b.i===b.i).p; why=src.why(b); label='Næste bog';
+   if(pool.length>1)cyc='<button type="button" class="btn ghost" id="nextcyc">↻ Træk ny</button>';
+   window._heroPool=pool;
  }
  host.innerHTML=`<div class="hero">${cover(b,'hcov')}<div class="hbody">
    <div class="hlbl">${label}</div>
@@ -545,7 +553,8 @@ function renderNext(){
    <div class="meta">${b.s?metaLine(b):'<span>Ikke på din TBR endnu</span>'}</div>
    <div class="acts">${readBtn(b)}${cyc}</div>
  </div></div>`;
- const nc=document.getElementById('nextcyc');if(nc)nc.onclick=()=>{window._nextIdx=(window._nextIdx||0)+1+Math.floor(Math.random()*5);renderNext();};
+ const nc=document.getElementById('nextcyc');if(nc)nc.onclick=()=>{const old=CH.hero;delete CH.hero;renderNext();if(CH.hero===old&&window._heroPool&&window._heroPool.length>1){reroll('hero',window._heroPool);renderNext();}};
+ if(window._heroShownId!==b.i){window._heroShownId=b.i;renderPicks();}
 }
 function renderStatus(){
  const h=document.getElementById('hoursline'),bx=document.getElementById('budgetbox');
@@ -583,7 +592,7 @@ function update(){
    if(!srcOK(b))return false;
    if(F.now&&!availNow(b))return false;
    if(F.free){const ct=costTier(b);if(!(ct==='owned'||ct==='lib'))return false;}
-   if(F.fit){if(!fitsOwn(b))return false;}else if(F.maxh<30){if(!b.hrs||b.hrs>F.maxh)return false;}
+   if(F.fit){if(!F.txt&&!fitsOwn(b))return false;}else if(F.maxh<30){if(!b.hrs||b.hrs>F.maxh)return false;}
    if(F.rate>0&&(!b.r||b.r<F.rate))return false;
    if(F.spice>0&&(!b.sp||b.sp<F.spice))return false;
    if(F.deep&&(b.rd==null||b.rd>=8000))return false;
@@ -626,7 +635,7 @@ function wire(){
  [['qNow','now'],['qFree','free'],['qFit','fit'],['qDeep','deep'],['qSeries','series']].forEach(([id,k])=>document.getElementById(id).onclick=()=>{F[k]=!F[k];update();});
  ['fText','fHours'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
 }
-document.getElementById('sub').textContent=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · opdateret ${new Date().toISOString().slice(0,10)}`;
+document.getElementById('sub').textContent=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}`;
 document.getElementById('foot').innerHTML='Deep-cut score = rating + bonus for få læsere, så skjulte perler rykker op over bestsellere. Længde = lydbogstimer. Covers hentes live fra Hardcover. "Din stemning" bygger på dine seneste læsninger, og "Noget helt andet" er det modsatte, så du kan bryde mønsteret. Begge opdateres, når du har læst noget nyt.';
 renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();
 </script></body></html>'''
