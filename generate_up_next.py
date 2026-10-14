@@ -266,7 +266,7 @@ const baseFit=b=>{const r=(b.s==='BookBeat'||b.s==='Spotify')?remFor(b.s):null;r
 // Nedre graense: er timerne tilbage under en standard-bog (avgBookHours), er der ikke plads til et rigtigt
 // valg paa den betalte kilde. Saa foreslaas hoejst 2 bøger der (næsten) fylder resten op - kun med kendt laengde -
 // og alt andet peger paa gratis/ejet/Libby. Er der mere end en standard-bog tilbage, gaelder det normale fit-tjek.
-const STD=(+BUD.avgBookHours>0)?+BUD.avgBookHours:12.5;
+const STD=(+((P.budget||{}).avgBookHours)>0)?+P.budget.avgBookHours:12.5;   // BUD er endnu ikke erklaeret her (TDZ)
 const FILL_MAX=2, FILL_MIN_RATING=3.4;
 let _fill=null;
 function fillSet(){if(_fill)return _fill;_fill=new Set();
