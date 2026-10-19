@@ -449,7 +449,7 @@ function statusOf(b) {
     return ['warn', 'Kø', 'Libby'];
   }
   const nm = {BB:'BookBeat', SP:'Spotify', LK:'Lokal', AB:'Audible'}[b.s];
-  return nm ? ['ok', 'Klar nu', nm] : ['', 'Ingen adgang', ''];
+  return nm ? ['ok', 'Klar nu', nm] : ['', 'Ikke tilgængelig endnu', ''];
 }
 function dots(n) { return `<span class="dots" role="img" aria-label="spice ${n} af 5">${Array.from({length:5},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span>`; }
 
