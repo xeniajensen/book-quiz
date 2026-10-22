@@ -203,6 +203,7 @@ input[type=range]{width:200px;accent-color:var(--ink)}
     <div class="grp"><h3>Længde</h3><div class="row2"><label for="fHours">Max timer: <b id="fhVal">alle</b></label><input type="range" id="fHours" min="4" max="30" step="1" value="30"></div><div class="hint" id="fitHint"></div></div>
     <div class="grp"><h3>Bedømmelse</h3><div class="row2" id="fRate" role="group" aria-label="Min. bedømmelse"></div></div>
     <div class="grp"><h3>Spice</h3><div class="row2" id="fSpice" role="group" aria-label="Min. spice"></div></div>
+    <div class="grp"><h3>Stemning &amp; årstid</h3><div class="row2" id="fMood" role="group" aria-label="Stemning og årstid"></div><div class="hint">Bygget på tags (efterår, hyggelig, uhyggelig, jul m.m.).</div></div>
     <div class="grp"><h3>Sortering</h3><div class="rad" id="fSort"></div></div>
     <div class="grp"><h3>Forslag til søgning</h3><div class="chips" id="chips"></div></div>
   </details>
@@ -248,7 +249,7 @@ const SRCS=['BookBeat','Spotify','Libby','Ejet','Ingen'];
 let SRCSEL=new Set(SRCS);
 try{const sv=JSON.parse(localStorage.getItem('un_src')||'null');if(Array.isArray(sv)){const f=sv.filter(x=>SRCS.includes(x));if(f.length)SRCSEL=new Set(f);}}catch(e){}
 const srcOK=b=>SRCSEL.has(srcGroup(b));
-const F={now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,maxh:30,sort:'useit',txt:''};
+const F={now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,mood:'',maxh:30,sort:'useit',txt:''};
 const fmt=n=>String(Math.round(n*10)/10).replace('.',',');
 function remFor(k){const o=k==='BookBeat'?BUD.bb:(k==='Spotify'?BUD.sp:null);if(!o)return null;const rem=Math.max(0,(o.limit||0)-(o.used||0));const dd=Number.isFinite(+o.daysLeft)&&+o.daysLeft>=0?Math.max(1,+o.daysLeft):30;const reachable=Math.min(rem,(+BUD.dailyCapacity>0?+BUD.dailyCapacity:2.0)*dd);return Math.round(reachable*10)/10;}  // timer hun reelt NAAR foer fornyelse
 // Passer i mine timer: BookBeat/Spotify-bøger må ikke være længere end timerne tilbage på netop den kilde.
@@ -443,7 +444,7 @@ document.addEventListener('click',async e=>{
  if(a){const s=a.closest('.upnextwrap').querySelector('.slider');s.scrollBy({left:(+a.dataset.dir)*300,behavior:'smooth'});}
 });
 async function loadML(){
- const cands=DATA.filter(b=>b.r&&startable(b)&&reach(b)).sort((a,b)=>dc(b)-dc(a)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:(b.tg||'').split(',').slice(0,8).join(','),readers:b.rd,rating:b.r}));
+ const cands=DATA.filter(b=>b.r&&startable(b)&&reach(b)).sort((a,b)=>dc(b)-dc(a)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:vibeFirst((b.tg||'').split(',')).slice(0,10).join(','),readers:b.rd,rating:b.r}));
  // Uden for Cowork: hent vibe'en live via workeren, som selv slår dine seneste
  // finishes op og cacher svaret indtil du har læst noget nyt. Fejler det, falder
  // vi tilbage til den bagte vibe fra det ugentlige build.
@@ -503,7 +504,7 @@ function upWhy(b,x){
  let d=(x&&x.desc)?String(x.desc).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim():'';
  if(d){if(d.length>240)d=d.slice(0,240).replace(/\s+\S*$/,'')+'…';return esc(d);}
  const bits=[];
- const tags=(b.tg||'').split(',').map(t=>t.trim()).filter(t=>t&&!/^(fiction|romance|contemporary|medium-paced|fast-paced|slow-paced)$/i.test(t)).slice(0,5);
+ const tags=vibeFirst((b.tg||'').split(',').map(t=>t.trim()).filter(t=>t&&!/^(fiction|romance|contemporary|medium-paced|fast-paced|slow-paced)$/i.test(t))).slice(0,5);
  if(tags.length)bits.push(esc(tags.join(' · ')));
  if(b.se)bits.push(`${b.sn?'Bind '+b.sn+' i':'Del af'} serien ${esc(b.se)}`);
  if(b.sp)bits.push(`spice ${b.sp}/5`);
@@ -568,10 +569,14 @@ function renderStatus(){
 const CHIPS=['enemies to lovers','grumpy sunshine','forced proximity','slow burn','found family','small town','fake relationship','forbidden love','second chance','dark','emotional','funny','fantasy','thriller','historical'];
 function renderChips(){const c=document.getElementById('chips');c.innerHTML='';CHIPS.forEach(t=>{const s=document.createElement('button');s.type='button';s.className='chip';s.textContent=t;s.onclick=()=>{fText.value=t;update();};c.appendChild(s);});}
 const SORTS=[['useit','Brug mine timer'],['cheap','Billigst først'],['rating','Højest bedømt'],['hours','Kortest'],['added','Længst på TBR'],['deep','Deep-cut score'],['rand','Tilfældig']];
+const MOODS=[['','Alle'],['autumn vibes','Efterår'],['cozy','Hyggelig'],['spooky','Uhyggelig'],['christmas','Jul'],['summer read','Sommer'],['cold-weather read','Vinter'],['witchy','Heksehygge'],['gothic','Gotisk'],['dark academia','Dark academia'],['atmospheric','Stemningsfuld']];
+const VIBE=new Set(MOODS.map(m=>m[0]).filter(Boolean).concat(['haunted','whimsical','bittersweet','heartwarming','feel-good','tearjerker','thrilling','unsettling','castle','cabin','bookstore','bakery/cafe','beach/lake','mountains','campus','boarding school','magic school','witch town','scotland/ireland','historical england']));
+const vibeFirst=arr=>{const a=arr.map(t=>t.trim()).filter(Boolean);return a.filter(t=>VIBE.has(t)).concat(a.filter(t=>!VIBE.has(t)));};
 function buildGroups(){
  const r=document.getElementById('fRate'),s=document.getElementById('fSpice'),so=document.getElementById('fSort');
  r.innerHTML='';[[0,'Alle'],[3.75,'★ 3,75+'],[4,'★ 4+'],[4.25,'★ 4,25+']].forEach(([v,l])=>{const b=mkTg(l,F.rate===v,()=>{F.rate=v;update();});b.dataset.v=v;r.appendChild(b);});
  s.innerHTML='';[[0,'Alle'],[1,'1+'],[2,'2+'],[3,'3+'],[4,'4+']].forEach(([v,l])=>{const b=mkTg(l,F.spice===v,()=>{F.spice=v;update();});b.dataset.v=v;s.appendChild(b);});
+ const md=document.getElementById('fMood');md.innerHTML='';MOODS.forEach(([v,l])=>{const b=mkTg(l,F.mood===v,()=>{F.mood=v;update();});b.dataset.v=v;md.appendChild(b);});
  so.innerHTML=SORTS.map(([k,l])=>`<label><input type="radio" name="fs" value="${k}"${F.sort===k?' checked':''}> ${l}</label>`).join('');
  so.querySelectorAll('input').forEach(i=>i.onchange=()=>{F.sort=i.value;update();});
 }
@@ -580,6 +585,7 @@ function syncUI(){
  set('qNow',F.now);set('qFree',F.free);set('qFit',F.fit);set('qDeep',F.deep);set('qSeries',F.series);
  document.querySelectorAll('#fRate .tg').forEach(b=>b.setAttribute('aria-pressed',(+b.dataset.v===F.rate)?'true':'false'));
  document.querySelectorAll('#fSpice .tg').forEach(b=>b.setAttribute('aria-pressed',(+b.dataset.v===F.spice)?'true':'false'));
+ document.querySelectorAll('#fMood .tg').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.v===F.mood)?'true':'false'));
  document.querySelectorAll('#fSort input').forEach(i=>i.checked=(i.value===F.sort));
  const q=document.getElementById('qFit');const r1=remFor('BookBeat'),r2=remFor('Spotify');
  q.title=(r1!=null||r2!=null)?`BookBeat ${r1!=null?fmt(r1)+' t':'–'} · Spotify ${r2!=null?fmt(r2)+' t':'–'} tilbage`:'';
@@ -587,7 +593,7 @@ function syncUI(){
  document.getElementById('fhVal').textContent=F.fit?'låst til dit budget':(F.maxh>=30?'alle':('≤ '+F.maxh+' t'));
  document.getElementById('fitHint').textContent=F.fit?`Låst, mens "Passer i mine timer" er slået til: BookBeat ${r1!=null?fmt(r1):'–'} t, Spotify ${r2!=null?fmt(r2):'–'} t. Ejede bøger og Libby er ikke begrænset.`:'';
 }
-function resetAll(){Object.assign(F,{now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,maxh:30,txt:''});document.getElementById('fText').value='';document.getElementById('fHours').value=30;SRCSEL=new Set(SRCS);try{localStorage.removeItem('un_src');}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
+function resetAll(){Object.assign(F,{now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,mood:'',maxh:30,txt:''});document.getElementById('fText').value='';document.getElementById('fHours').value=30;SRCSEL=new Set(SRCS);try{localStorage.removeItem('un_src');}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
 function update(){
  F.txt=fText.value.trim().toLowerCase(); F.maxh=+fHours.value;
  let rows=DATA.filter(b=>{
@@ -597,6 +603,7 @@ function update(){
    if(F.fit){if(!F.txt&&!fitsOwn(b))return false;}else if(F.maxh<30){if(!b.hrs||b.hrs>F.maxh)return false;}
    if(F.rate>0&&(!b.r||b.r<F.rate))return false;
    if(F.spice>0&&(!b.sp||b.sp<F.spice))return false;
+   if(F.mood&&!has(b,F.mood))return false;
    if(F.deep&&(b.rd==null||b.rd>=8000))return false;
    if(F.series&&b.sn!==1)return false;
    if(F.txt){const hay=(b.t+' '+b.a+' '+(b.tg||'')+' '+(b.se||'')).toLowerCase();if(!hay.includes(F.txt))return false;}
