@@ -4,7 +4,8 @@ Rebuilds .continue.json for the Up Next "📖 Continue a series" card.
 
 Unlike the live 🔖 hero (which only covers series you're ACTIVELY reading — one of
 your last 3 finishes), this card covers EVERY series you've ever read a book in that
-has a next installment waiting on your TBR, however long ago you read it.
+has a next installment waiting on your TBR, however long ago you read it —
+except series you left off disliking (left-off rating ≤2).
 
 Logic:
   • Fetch all READ books (status 3) that belong to a series → per series, your read
@@ -130,6 +131,9 @@ def main():
         if not cands:
             continue
         left_at = info["anchor"]["position"]
+        left_rating = info["anchor"].get("rating")
+        if left_rating is not None and left_rating <= 2:
+            continue  # skip series she left off disliking (unrated is fine)
         nexts = [w for w in cands
                  if w["position"] > left_at
                  and w["position"] not in info["positions"]

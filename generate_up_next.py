@@ -214,7 +214,30 @@ input[type=range]{width:200px;accent-color:var(--ink)}
 <div class="foot" id="foot"></div>
 </div>
 <script>
-const P=__DATA__; const DATA=P.books; let RECENT=P.recent; const BAKED=P.baked; const BAKED_OPP=P.bakedOpp||{picks:[]}; const CONT=P.cont||{}; const COV={};
+const P=__DATA__; const DATA=P.books.slice(); let RECENT=P.recent; const BAKED=P.baked; const BAKED_OPP=P.bakedOpp||{picks:[]}; const CONT=P.cont||{}; const COV={};
+// ── Live status: skjul bøger der er læst / læses nu / droppet / fjernet fra TBR ──
+const HIDE=new Set(); let LIVE=false; let HIDDEN_N=0;
+const LS_KEY='upnext_hidden_v1';
+function lsGet(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return [];}}
+function lsAdd(id){try{const a=lsGet();if(!a.includes(id)){a.push(id);localStorage.setItem(LS_KEY,JSON.stringify(a.slice(-300)));}}catch(e){}}
+const alive=id=>!HIDE.has(+id);
+async function applyLive(){
+ lsGet().forEach(id=>HIDE.add(+id));            // lokalt: bøger du lige har trykket 'start' på
+ try{
+  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),7000);
+  const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({action:'tbr_status',ids:DATA.map(b=>b.i)})});
+  clearTimeout(to);const d=await r.json();
+  if(d&&d.ok&&Array.isArray(d.want)&&d.want.length>=DATA.length*0.5){
+    const want=new Set(d.want.map(Number));
+    DATA.forEach(b=>{if(!want.has(+b.i))HIDE.add(+b.i);});
+    (d.done||[]).forEach(id=>HIDE.add(+id));
+    LIVE=true;
+    // Står en lokalt skjult bog igen på want-to-read (fx fortrudt), vis den igen
+    lsGet().forEach(id=>{if(want.has(+id)&&!(d.done||[]).includes(+id))HIDE.delete(+id);});
+  }
+ }catch(e){}
+ for(let i=DATA.length-1;i>=0;i--){if(HIDE.has(+DATA[i].i)){DATA.splice(i,1);HIDDEN_N++;}}
+}
 const _re={};
 const has=(b,...kw)=>{const t=(b.tg||'');return kw.some(k=>{const r=_re[k]||(_re[k]=new RegExp('(^|[^a-z])'+k.replace(/[.*+?^${}()|[\]\\\/]/g,'\\$&')+'([^a-z]|$)','i'));return r.test(t);});};
 const availNow=b=>b.av==='now'; const availSoon=b=>b.av==='now'||b.av==='short';
@@ -227,7 +250,7 @@ const lenB=b=>b.hrs?`<span class="badge">🎧 ${b.hrs} hrs</span>`:(b.p?`<span c
 const readB=b=>b.rd!=null?`<span class="badge">${b.rd.toLocaleString()} readers</span>`:'';
 const covImg=(b,cls)=>{const u=COV[b.i];return u?`<img class="${cls}" src="${u}" alt="" loading="lazy" onerror="this.classList.add('blank')">`:`<img class="${cls} blank" alt="">`;};
 const dc=b=>(b.r||3.5)+0.4*Math.max(0,3-Math.log10((b.rd||300)+10));
-const byId=Object.fromEntries(DATA.map(b=>[b.i,b]));
+let byId={};
 // Startable = safe to recommend as an entry point: a standalone, a #1 (or prequel),
 // or the legitimate next-in-series she can pick up (present in CONT). A book that's
 // #2+ in a series she hasn't caught up on is NOT startable, so it never gets suggested.
@@ -430,14 +453,14 @@ function renderPicks(){
  host.innerHTML=html.join('');
  host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{reroll(btn.dataset.k,pools[btn.dataset.k]);renderPicks();});
 }
-function applyML(vibe,picks){window._ml={vibe:vibe,picks:picks};delete CH.ml;
+function applyML(vibe,picks){picks=(picks||[]).filter(p=>alive(p.id));window._ml={vibe:vibe,picks:picks};delete CH.ml;
  const v=document.getElementById('vibe');if(v)v.textContent=vibe||'';renderPicks();}
-function applyOpp(vibe,picks){window._opp={vibe:vibe,picks:picks};delete CH.opp;renderPicks();}
+function applyOpp(vibe,picks){picks=(picks||[]).filter(p=>alive(p.id));window._opp={vibe:vibe,picks:picks};delete CH.opp;renderPicks();}
 document.addEventListener('click',async e=>{
  const t=e.target.closest('.readbtn');
  if(t){t.disabled=true;t.textContent='Starter…';
    try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add_currently_reading',book_id:+t.dataset.id})});
-     const d=await r.json();if(d&&!d.error&&!d.errors){t.textContent='✓ Læser nu';}else{t.textContent='Kunne ikke opdatere';t.disabled=false;}}
+     const d=await r.json();if(d&&!d.error&&!d.errors){t.textContent='✓ Læser nu';lsAdd(+t.dataset.id);HIDE.add(+t.dataset.id);setTimeout(()=>{const i=DATA.findIndex(b=>+b.i===+t.dataset.id);if(i>=0)DATA.splice(i,1);try{renderPicks();update();renderNext();renderUpNext(window._upnext);}catch(e){}},1200);}else{t.textContent='Kunne ikke opdatere';t.disabled=false;}}
    catch(err){t.textContent='Kunne ikke opdatere';t.disabled=false;}
    return;}
  const a=e.target.closest('.arrow');
@@ -513,6 +536,7 @@ function upWhy(b,x){
  return bits.length?bits.join('. ')+'.':'Ligger på din Up Next-liste på Hardcover. Ingen yderligere data om bogen endnu.';
 }
 function renderUpNext(list){
+ list=(list||[]).filter(x=>alive(x.id));
  window._upnext=list; renderNext(); const host=document.getElementById('upnext'); if(!host)return;
  if(!list||!list.length){host.innerHTML='';return;}
  list.forEach(x=>{if(x.cover)COV[x.id]=x.cover;});
@@ -521,7 +545,7 @@ function renderUpNext(list){
  host.innerHTML=`<div class="upnextwrap"><div class="unhead"><div><h2 style="margin-top:6px">Din Up Next</h2><p class="h2sub" style="margin-bottom:0">Håndplukket af dig på Hardcover. Hentes live, hver gang siden åbnes.</p></div><div class="arrows"><button type="button" class="arrow" data-dir="-1" aria-label="Forrige">←</button><button type="button" class="arrow" data-dir="1" aria-label="Næste">→</button></div></div><div class="slider">${cards}</div></div>`;
 }
 // Næste bog: næste i en serie du er i gang med (live fra workeren). Findes den ikke, trækkes en bog fra "Brug dine betalte timer"/"Gratis".
-function renderHero(pick){window._heroPick=pick;renderNext();}
+function renderHero(pick){if(pick&&!alive(pick.id))pick=null;window._heroPick=pick;renderNext();}
 // Naeste bog: er der en klar betalt kilde, kommer den foerst. Ellers blandes betalt (fyld-boegerne),
 // gratis/ejet og klar-nu i een pulje, saa helten ikke altid er en af de samme to BookBeat-boeger.
 function nextPool(){const up=upIds();const get=k=>{const p=PICKS.find(x=>x.k===k);return p?p.pool().filter(srcOK).filter(b=>!up.has(b.i)).map(b=>({b,p})):[];};
@@ -644,9 +668,9 @@ function wire(){
  [['qNow','now'],['qFree','free'],['qFit','fit'],['qDeep','deep'],['qSeries','series']].forEach(([id,k])=>document.getElementById(id).onclick=()=>{F[k]=!F[k];update();});
  ['fText','fHours'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
 }
-document.getElementById('sub').textContent=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}`;
+function setSub(){document.getElementById('sub').textContent=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}${LIVE?` · live status ok${HIDDEN_N?` (${HIDDEN_N} skjult)`:''}`:' · live status ikke tilgængelig'}`;}
 document.getElementById('foot').innerHTML='Deep-cut score = rating + bonus for få læsere, så skjulte perler rykker op over bestsellere. Længde = lydbogstimer. Covers hentes live fra Hardcover. "Din stemning" bygger på dine seneste læsninger, og "Noget helt andet" er det modsatte, så du kan bryde mønsteret. Begge opdateres, når du har læst noget nyt.';
-renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();
+(async()=>{await applyLive();byId=Object.fromEntries(DATA.map(b=>[b.i,b]));setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();})();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
