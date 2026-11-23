@@ -302,7 +302,7 @@ function renderSrcFilter(){const h=document.getElementById('fSrc');if(!h)return;
   h.appendChild(mkTg('Alle',all,()=>{SRCSEL=new Set(SRCS);saveSrc();}));
   SRCS.forEach(k=>{h.appendChild(mkTg(k==='Ejet'?'Ejet (Lokal/Audible)':(k==='Ingen'?'Ikke tilgængelig endnu':k),!all&&SRCSEL.has(k),()=>{
     if(SRCSEL.size===SRCS.length){SRCSEL=new Set([k]);}else if(SRCSEL.has(k)){SRCSEL.delete(k);if(!SRCSEL.size)SRCSEL=new Set(SRCS);}else{SRCSEL.add(k);}saveSrc();}));});}
-function saveSrc(){try{localStorage.setItem('un_src',JSON.stringify([...SRCSEL]));}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
+function saveSrc(){try{localStorage.setItem('un_src',JSON.stringify([...SRCSEL]));}catch(e){}renderSrcFilter();update();}  // kildefilteret gælder kun 'Udforsk din TBR', ikke kortene
 const _rnd={};const RND=i=>_rnd[i]??(_rnd[i]=Math.random());
 const costRank={owned:0,lib:1,inc:2,paid:3,none:4};
 const costLabel={owned:'💰 Ejet',lib:'💰 Gratis (Libby)',inc:'💰 Spotify-timer',paid:'💳 BookBeat',none:''};
@@ -415,7 +415,7 @@ function applyEffective(){
 const PICKS=[
  {k:'useit',lb:'Brug dine betalte timer',pool:()=>{const order=['BookBeat','Spotify'].sort((a,b)=>urg(b)-urg(a));
    for(const best of order){if(urg(best)<=0)continue;
-     const pl=DATA.filter(b=>b.s===best&&startable(b)&&fitsOwn(b)&&srcOK(b));
+     const pl=DATA.filter(b=>b.s===best&&startable(b)&&fitsOwn(b));
      if(pl.length)return pl;}
    return [];},
   why:b=>{const bd=b.s==='BookBeat'?BUD.bb:BUD.sp;const rem=bd?((bd.limit||0)-(bd.used||0)):null;
@@ -497,7 +497,7 @@ function snooze(id){SNZ[id]=Date.now()+30*DAY;jset(SNZ_KEY,SNZ);const i=DATA.fin
   renderPicks();renderNext();update();setSub();}
 function unsnoozeAll(){SNZ={};jset(SNZ_KEY,SNZ);location.reload();}
 const cycBtn=(k,n)=>n>1?`<button type="button" class="btn ghost cyc" data-k="${k}">↻ Træk ny</button>`:'';
-function aiPool(src){return (src&&src.picks?src.picks:[]).filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id])).map(pk=>Object.assign({},byId[pk.id],{_rsn:pk.reason||''}));}
+function aiPool(src){return (src&&src.picks?src.picks:[]).filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&reach(byId[pk.id])).map(pk=>Object.assign({},byId[pk.id],{_rsn:pk.reason||''}));}
 function renderPicks(){
  const host=document.getElementById('picks');if(!host)return;
  const used=upIds();if(window._heroShownId!=null)used.add(window._heroShownId);
@@ -506,7 +506,7 @@ function renderPicks(){
    const pool=aiPool(src).filter(b=>!used.has(b.i));const b=choose(k,pool);if(!b)return;used.add(b.i);pools[k]=pool;
    html.push(card(lb,b,b._rsn,cycBtn(k,pool.length),true,note));});
  const prior=[];
- PICKS.forEach(p=>{const full=p.pool().filter(srcOK);
+ PICKS.forEach(p=>{const full=p.pool();
    // Overlap: viser kortet stort set de samme boeger som et kort ovenover (>=85%), springes det over.
    if(!['useit','cont','unavail'].includes(p.k)&&full.length){const ids=full.map(b=>b.i);
      if(prior.some(S=>ids.filter(i=>S.has(i)).length/ids.length>=0.85))return;}
@@ -615,7 +615,7 @@ function renderUpNext(list){
 function renderHero(pick){if(pick&&(!alive(pick.id)||snoozed(pick.id)))pick=null;window._heroPick=pick;renderNext();}
 // Naeste bog: er der en klar betalt kilde, kommer den foerst. Ellers blandes betalt (fyld-boegerne),
 // gratis/ejet og klar-nu i een pulje, saa helten ikke altid er en af de samme to BookBeat-boeger.
-function nextPool(){const up=upIds();const get=k=>{const p=PICKS.find(x=>x.k===k);return p?p.pool().filter(srcOK).filter(ready).filter(b=>!up.has(b.i)).map(b=>({b,p})):[];};
+function nextPool(){const up=upIds();const get=k=>{const p=PICKS.find(x=>x.k===k);return p?p.pool().filter(ready).filter(b=>!up.has(b.i)).map(b=>({b,p})):[];};
  if(budgetState().clear){for(const k of ['useit','free','nowait']){const l=get(k);if(l.length)return l;}return [];}
  const seen=new Set(),mix=[];['useit','free','nowait'].forEach(k=>get(k).forEach(x=>{if(!seen.has(x.b.i)){seen.add(x.b.i);mix.push(x);}}));return mix;}
 function renderNext(){
