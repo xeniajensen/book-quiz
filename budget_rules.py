@@ -13,7 +13,7 @@ import json, os, datetime
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 FILL_MAX = 2          # hoejst saa mange fyld-boeger pr. kilde
-FILL_MIN_RATING = 3.4 # mindste blended rating for en fyld-bog
+FILL_MIN_RATING = 0   # ingen rating-gulv: bøgerne er bevidst valgt til TBR (var 3.4)
 TOL = 0.1             # timers tolerance naar en bog skal passe
 SRC = {'bb': 'BookBeat', 'sp': 'Spotify'}
 

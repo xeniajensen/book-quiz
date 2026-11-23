@@ -72,7 +72,7 @@ if os.path.exists('.teasers.json'):
 slim = [{"i": b["id"], "t": b["title"], "a": b["author"], "s": b["source"], "av": b["avail"],
          "r": round(b["rating"], 2) if b["rating"] else None, "hrs": b["hrs"], "p": b.get("pages"),
          "sp": b["spice"], "se": b["series"], "sn": b["snum"], "d": b["dateAdded"], "lb": b["libby"],
-         "rd": b["readers"], "tg": b["tags"], "sl": b["slug"], "tz": TEASERS.get(str(b["id"]), "")} for b in data]
+         "rd": b["readers"], "tg": b["tags"], "sl": b["slug"], "tz": TEASERS.get(str(b["id"]), ""), "al": b.get("alts")} for b in data]
 PAYLOAD = json.dumps({"books": slim, "recent": RECENT, "baked": BAKED, "bakedOpp": BAKED_OPP, "cont": CONT, "worker": WORKER, "list": ALL_TBR_LIST, "upnext": UP_NEXT_LIST, "budget": BUDGET, "built": datetime.date.today().isoformat()}, ensure_ascii=False)
 
 HTML = r'''<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -119,6 +119,7 @@ a{color:inherit}
 .au{color:var(--ink2);font-size:13px;margin-bottom:6px}
 .why{font-size:14px;color:var(--ink);line-height:1.5}
 .rsn{font-size:12.5px;color:var(--ink2);line-height:1.45;margin-top:6px}
+.snote{font-size:12.5px;color:var(--ink2);margin-top:6px}
 .rsn::before{content:"Hvorfor nu: ";font-weight:600}
 .hero .rsn{font-size:13px}
 .upnextwrap .why{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
@@ -126,7 +127,7 @@ a{color:inherit}
 .star{color:var(--ink);font-weight:600}
 .st{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink)}
 .st i{width:8px;height:8px;border-radius:50%;background:var(--none);display:inline-block}
-.st-now i{background:var(--ok)}.st-short i{background:var(--warn)}.st-long i{background:var(--none);opacity:.55}.st-none i{background:transparent;border:1.5px solid var(--none)}
+.st-later i{background:transparent;border:1.5px solid var(--warn)}.st-now i{background:var(--ok)}.st-short i{background:var(--warn)}.st-long i{background:var(--none);opacity:.55}.st-none i{background:transparent;border:1.5px solid var(--none)}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:12px}
 .btn{font:inherit;font-size:14px;font-weight:600;min-height:36px;padding:6px 16px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
 .btn:hover{background:#000}.btn:disabled{opacity:.65;cursor:default}
@@ -240,7 +241,8 @@ async function applyLive(){
 }
 const _re={};
 const has=(b,...kw)=>{const t=(b.tg||'');return kw.some(k=>{const r=_re[k]||(_re[k]=new RegExp('(^|[^a-z])'+k.replace(/[.*+?^${}()|[\]\\\/]/g,'\\$&')+'([^a-z]|$)','i'));return r.test(t);});};
-const availNow=b=>b.av==='now'; const availSoon=b=>b.av==='now'||b.av==='short';
+const availNow=b=>b.av==='now'&&!later(b); const availSoon=b=>b.av==='now'||b.av==='short';
+const later=b=>(b.s==='BookBeat'||b.s==='Spotify')&&typeof fitsOwn==='function'&&!fitsOwn(b);
 const srcBadge=b=>`<span class="badge src-${b.s}">${b.s}</span>`;
 const avLabel={now:'Available now',short:'Short wait',long:'Long wait',none:'Not available'};
 const avBadge=b=>`<span class="pill av-${b.av}">${avLabel[b.av]}</span>`;
@@ -254,7 +256,11 @@ let byId={};
 // Startable = safe to recommend as an entry point: a standalone, a #1 (or prequel),
 // or the legitimate next-in-series she can pick up (present in CONT). A book that's
 // #2+ in a series she hasn't caught up on is NOT startable, so it never gets suggested.
-const startable=b=>!(b.sn>1)||!!CONT[b.i];
+// Romance-serier er typisk selvstaendige bøger i samme univers (ny hovedpar pr. bog), saa #2+ maa godt foreslaas
+// dér. Fantasy/sci-fi/thriller-serier bygger paa hinanden og kraever stadig #1 / at du er i gang.
+const romanceSeries=b=>has(b,'romance')&&!has(b,'fantasy','romantasy','sci-fi','science fiction','dystopian','paranormal','epic fantasy','high fantasy','thriller','mystery','crime');
+const startable=b=>!(b.sn>1)||!!CONT[b.i]||romanceSeries(b);
+const seriesNote=b=>(b.sn>1&&!CONT[b.i]&&b.se)?`Bind ${b.sn} i ${b.se}. Romance-serier kan som regel læses hver for sig.`:'';
 
 // ── Kilde-omkostning ─────────────────────────────────────────────────────────
 // owned = Lokal/Audible (ejet, 0 kr). lib = Libby (gratis, men lånekvote/kø).
@@ -272,7 +278,7 @@ const SRCS=['BookBeat','Spotify','Libby','Ejet','Ingen'];
 let SRCSEL=new Set(SRCS);
 try{const sv=JSON.parse(localStorage.getItem('un_src')||'null');if(Array.isArray(sv)){const f=sv.filter(x=>SRCS.includes(x));if(f.length)SRCSEL=new Set(f);}}catch(e){}
 const srcOK=b=>SRCSEL.has(srcGroup(b));
-const F={now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,mood:'',maxh:30,sort:'useit',txt:''};
+const F={now:false,free:false,fit:false,deep:false,series:false,rate:0,spice:0,mood:'',maxh:30,sort:'useit',txt:''};
 const fmt=n=>String(Math.round(n*10)/10).replace('.',',');
 function remFor(k){const o=k==='BookBeat'?BUD.bb:(k==='Spotify'?BUD.sp:null);if(!o)return null;const rem=Math.max(0,(o.limit||0)-(o.used||0));const dd=Number.isFinite(+o.daysLeft)&&+o.daysLeft>=0?Math.max(1,+o.daysLeft):30;const reachable=Math.min(rem,(+BUD.dailyCapacity>0?+BUD.dailyCapacity:2.0)*dd);return Math.round(reachable*10)/10;}  // timer hun reelt NAAR foer fornyelse
 // Passer i mine timer: BookBeat/Spotify-bøger må ikke være længere end timerne tilbage på netop den kilde.
@@ -297,6 +303,7 @@ function renderSrcFilter(){const h=document.getElementById('fSrc');if(!h)return;
   SRCS.forEach(k=>{h.appendChild(mkTg(k==='Ejet'?'Ejet (Lokal/Audible)':(k==='Ingen'?'Ikke tilgængelig endnu':k),!all&&SRCSEL.has(k),()=>{
     if(SRCSEL.size===SRCS.length){SRCSEL=new Set([k]);}else if(SRCSEL.has(k)){SRCSEL.delete(k);if(!SRCSEL.size)SRCSEL=new Set(SRCS);}else{SRCSEL.add(k);}saveSrc();}));});}
 function saveSrc(){try{localStorage.setItem('un_src',JSON.stringify([...SRCSEL]));}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
+const _rnd={};const RND=i=>_rnd[i]??(_rnd[i]=Math.random());
 const costRank={owned:0,lib:1,inc:2,paid:3,none:4};
 const costLabel={owned:'💰 Ejet',lib:'💰 Gratis (Libby)',inc:'💰 Spotify-timer',paid:'💳 BookBeat',none:''};
 const costPill=b=>{const c=costTier(b);return costLabel[c]?`<span class="badge cost-${c}">${costLabel[c]}</span>`:'';};
@@ -352,7 +359,7 @@ const urgency=b=>{
 function budgetState(){let push=null,pushU=-1,levelU=-99,anyRem=false;
   [['BookBeat',BUD.bb],['Spotify',BUD.sp]].forEach(([k,o])=>{if(!o)return;const rem=(o.limit||0)-(o.used||0),d=dl(o.daysLeft),u=urg(k);
     if(rem>0)anyRem=true;
-    const usable=DATA.some(b=>b.s===k&&b.r&&b.r>=3.4&&startable(b)&&fitsOwn(b));
+    const usable=DATA.some(b=>b.s===k&&startable(b)&&fitsOwn(b));
     if(usable&&u>pushU){pushU=u;push=k;}
     levelU=Math.max(levelU,rawUrg(rem,d));});
   return {push,pushU,levelU,anyRem,clear:pushU>0&&levelU>=0.5&&!smallLeft(push)};}
@@ -365,7 +372,7 @@ function budgetBanner(){
     const spildt=Math.round((rem-naar)*10)/10;
     parts.push(`<b>${navn}</b> ${o.used||0} / ${o.limit} t brugt · ${rem} t tilbage på ${d} dage`
       +(rem>0?` · når ca. <b>${Math.round(naar*10)/10} t</b> i dit tempo${spildt>0.5?` (${spildt} t udløber uanset hvad)`:''}`:' · <b>loft nået</b>'));
-    const usable=DATA.some(b=>b.s===srcKey&&b.r&&b.r>=3.4&&startable(b)&&fitsOwn(b));
+    const usable=DATA.some(b=>b.s===srcKey&&startable(b)&&fitsOwn(b));
     if(usable&&u>pushU){pushU=u;push=navn;pushDays=d;}
     levelU=Math.max(levelU,rawUrg(rem,d));
   };
@@ -384,52 +391,81 @@ function budgetBanner(){
   return `<div class="budget"><div class="bhdr">💳 Dine lyttetimer</div>${parts.map(p=>`<div>${p}</div>`).join('')}<div class="brec">${rec}</div></div>`;
 }
 
+// ── Flere kilder pr. bog ─────────────────────────────────────────────────────
+// En bog kan ligge flere steder (fx Spotify OG Libby). Vi bruger den kilde der er bedst i dag:
+// ejet > Libby ledig > betalt med timer der rækker > Libby kort kø > betalt efter fornyelse > Libby lang kø.
+function applyEffective(){
+  DATA.forEach(b=>{
+    const opts=[{s:b.s,av:b.av}];
+    if(b.al&&b.al.lb)opts.push({s:'Libby',av:b.al.lb});
+    if(b.al&&b.al.bb)opts.push({s:'BookBeat',av:'now'});
+    b.s0=b.s; b.alt=opts.map(o=>o.s);
+    if(opts.length<2)return;
+    const sc=o=>{const t=Object.assign({},b,{s:o.s,av:o.av});
+      if(o.s==='Lokal'||o.s==='Audible')return 100;
+      if(o.s==='Libby')return o.av==='now'?90:(o.av==='short'?60:20);
+      if(o.s==='BookBeat'||o.s==='Spotify')return fitsOwn(t)?80+Math.max(0,urg(o.s)):40;
+      return 0;};
+    const best=opts.slice().sort((a,c)=>sc(c)-sc(a))[0];
+    b.s=best.s; b.av=best.av;
+  });
+}
 // Everyday picks: uniform-random draw from books that FIT the card (equal odds, popular or
 // obscure). Only Deep cut and Hype check deliberately lean. Light rating floors keep out duds.
 const PICKS=[
  {k:'useit',lb:'Brug dine betalte timer',pool:()=>{const order=['BookBeat','Spotify'].sort((a,b)=>urg(b)-urg(a));
    for(const best of order){if(urg(best)<=0)continue;
-     const pl=DATA.filter(b=>b.s===best&&b.r&&b.r>=3.4&&startable(b)&&fitsOwn(b)&&srcOK(b));
+     const pl=DATA.filter(b=>b.s===best&&startable(b)&&fitsOwn(b)&&srcOK(b));
      if(pl.length)return pl;}
    return [];},
   why:b=>{const bd=b.s==='BookBeat'?BUD.bb:BUD.sp;const rem=bd?((bd.limit||0)-(bd.used||0)):null;
    return `Du har ${rem!=null?fmt(rem)+' t ':''}tilbage på ${b.s} i denne periode. Timerne nulstilles, uanset om du bruger dem, så start her før de ejede bøger.`;}},
- {k:'free',lb:'Gratis nu',note:'Libby eller ejet',pool:()=>DATA.filter(b=>freeNow(b)&&b.r&&b.r>=3.4&&startable(b)),why:b=>b.s==='Libby'?`Ledig på Libby nu. Det koster ingenting, så lån den, før køen vender tilbage.`:`Du ejer den allerede (${b.s}): ingen kø og ingen abonnementstimer.`},
- {k:'nowait',lb:'Ingen ventetid',pool:()=>DATA.filter(b=>availNow(b)&&b.r&&b.r>=3.5&&startable(b)),why:b=>`Klar på ${b.s} lige nu uden venteliste. Start den, når du vil.`},
- {k:'quick',lb:'Kort lytning',pool:()=>DATA.filter(b=>availNow(b)&&b.hrs&&b.hrs<=9&&b.r&&b.r>=3.4&&startable(b)),why:b=>`Kun ${fmt(b.hrs)} timer og klar nu. Nem at gennemføre.`},
- {k:'wreck',lb:'Knus mig',pool:()=>DATA.filter(b=>b.r&&b.r>=3.8&&startable(b)&&(has(b,'sad','tearjerking','heartbreaking','death / grief','grief')||(has(b,'angst')&&has(b,'emotional')))),why:b=>`Følelsesladet og lidt ødelæggende, til når du vil mærke noget.`},
- {k:'cozy',lb:'Hyggeaften',pool:()=>DATA.filter(b=>availNow(b)&&startable(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')&&!has(b,'dark','depress','sad','tense','horror','grief','suicide','self harm','abuse','mental illness','challenging','disturbing','violence','war','death','angst')),why:b=>`Let og trøstende, og klar nu. Skænk noget at drikke og slap af.`},
- {k:'series',lb:'Start en serie',pool:()=>DATA.filter(b=>b.sn===1&&b.r&&b.r>=3.5),why:b=>`${b.se} #1: begynd på en ny serie.`},
+ {k:'free',lb:'Gratis nu',note:'Libby eller ejet',pool:()=>DATA.filter(b=>freeNow(b)&&startable(b)),why:b=>b.s==='Libby'?(b.s0&&b.s0!=='Libby'?`Står som ${b.s0} på din liste, men er også ledig på Libby nu. Lån den der og spar dine ${b.s0}-timer.`:`Ledig på Libby nu. Det koster ingenting, så lån den, før køen vender tilbage.`):`Du ejer den allerede (${b.s}): ingen kø og ingen abonnementstimer.`},
+ {k:'nowait',lb:'Ingen ventetid',pool:()=>DATA.filter(b=>availNow(b)&&ready(b)&&startable(b)),why:b=>`Klar på ${b.s} lige nu uden venteliste. Start den, når du vil.`},
+ {k:'quick',lb:'Kort lytning',pool:()=>DATA.filter(b=>b.hrs&&b.hrs<=9&&startable(b)),why:b=>`Kun ${fmt(b.hrs)} timer${whenTxt(b)}. Nem at gennemføre.`},
+ {k:'wreck',lb:'Knus mig',pool:()=>DATA.filter(b=>startable(b)&&(has(b,'sad','tearjerking','heartbreaking','death / grief','grief')||(has(b,'angst')&&has(b,'emotional')))),why:b=>`Følelsesladet og lidt ødelæggende, til når du vil mærke noget.`},
+ {k:'cozy',lb:'Hyggeaften',pool:()=>DATA.filter(b=>startable(b)&&has(b,'cute','lighthearted','funny','cozy','heartwarming','feel-good','small town','wholesome')&&!has(b,'dark','depress','sad','tense','horror','grief','suicide','self harm','abuse','mental illness','challenging','disturbing','violence','war','death','angst')),why:b=>`Let og trøstende${whenTxt(b)}. Skænk noget at drikke og slap af.`},
+ {k:'series',lb:'Start en serie',pool:()=>DATA.filter(b=>b.sn===1),why:b=>`${b.se} #1: begynd på en ny serie.`},
  {k:'cont',lb:'Fortsæt en serie',pool:()=>DATA.filter(b=>CONT[b.i]),why:b=>{const c=CONT[b.i];const lead=(c.er!=null)?`Du gav “${c.et}” ${c.er}★`:`Du har læst “${c.et}”`;return `${lead}. Tag ${b.se||'serien'} op igen (#${c.pos}).`;}},
  {k:'deep',lb:'Deep cut',note:'vægtet mod mindre kendte',pool:()=>DATA.filter(b=>b.r&&b.r>=4.0&&b.rd!=null&&b.rd<4000&&startable(b)),why:b=>`Kun ${b.rd?b.rd.toLocaleString('da-DK'):'få'} læsere, men ${b.r} i rating: en skjult perle.`},
- {k:'backlog',lb:'Længst på din TBR',pool:()=>DATA.filter(b=>b.d&&b.r&&startable(b)&&reach(b)).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Været på din liste siden ${b.d}. Måske er tiden kommet.`},
- {k:'spicy',lb:'Spicy valg',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&availNow(b)&&startable(b)),why:b=>`Spice ${b.sp}/5 og klar nu. Skru op for varmen.`},
+ {k:'backlog',lb:'Længst på din TBR',pool:()=>DATA.filter(b=>b.d&&startable(b)&&reach(b)).sort((a,b)=>a.d.localeCompare(b.d)).slice(0,30),why:b=>`Været på din liste siden ${b.d}. Måske er tiden kommet.`},
+ {k:'spicy',lb:'Spicy valg',pool:()=>DATA.filter(b=>b.sp&&b.sp>=4&&startable(b)),why:b=>`Spice ${b.sp}/5${whenTxt(b)}. Skru op for varmen.`},
  {k:'hype',lb:'Hype check',note:'vægtet mod populære',pool:()=>DATA.filter(b=>b.rd!=null&&startable(b)&&reach(b)).sort((a,b)=>b.rd-a.rd).slice(0,25),why:b=>`Blandt de mest læste på din liste, med ${b.rd?b.rd.toLocaleString('da-DK'):'mange'} læsere. Se om hypen holder.`},
- {k:'surprise',lb:'Overrask mig',note:'helt tilfældig',pool:()=>DATA.filter(b=>b.r&&startable(b)),why:b=>`Et helt tilfældigt træk fra hele din TBR, populær eller obskur med lige odds.`},
+ {k:'surprise',lb:'Overrask mig',note:'helt tilfældig',pool:()=>DATA.filter(b=>startable(b)),why:b=>`Et helt tilfældigt træk fra hele din TBR, populær eller obskur med lige odds.`},
 ];
 // Naabar: kan hun faktisk gaa i gang nu? Klar/kort ventetid, har en kilde, og passer i timerne tilbage.
-const reach=b=>(b.av==='now'||b.av==='short')&&!!b.s&&b.s!=='Ingen'&&fitsOwn(b);
+// reach = har en kilde og er ledig/kort ventetid. Betalte boeger der ikke passer i timerne er STADIG med
+// (de vises med "fra <dato>"), saa kortene ikke skrumper til de faa ejede/Libby-boeger naar timerne er brugt.
+// ready = kan startes i dag (passer ogsaa i timerne). Bruges af "Brug dine timer", "Ingen ventetid" og helten.
+const reach=b=>(b.av==='now'||b.av==='short')&&!!b.s&&b.s!=='Ingen';
+const ready=b=>reach(b)&&fitsOwn(b);
 PICKS.forEach(p=>{const o=p.pool;p.pool=()=>o().filter(reach);});
 // Ikke tilgængelig endnu: bøger uden kilde vises som egen ønskeliste-card (omgår reach, de kan jo ikke startes nu).
-PICKS.push({k:'unavail',lb:'Ikke tilgængelig endnu',note:'ønskeliste',pool:()=>DATA.filter(b=>b.s==='Ingen'&&b.r&&b.r>=3.4&&startable(b)),why:b=>`Findes ikke på BookBeat, Spotify eller Libby endnu. Den står på din TBR og dukker op her, når den bliver tilgængelig.`});
+PICKS.push({k:'unavail',lb:'Ikke tilgængelig endnu',note:'ønskeliste',pool:()=>DATA.filter(b=>b.s==='Ingen'&&startable(b)),why:b=>`Findes ikke på BookBeat, Spotify eller Libby endnu. Den står på din TBR og dukker op her, når den bliver tilgængelig.`});
 const idx={};
 const stLabel={now:'Klar nu',short:'Kort ventetid',long:'Lang ventetid',none:'Ikke tilgængelig endnu'};
-const stHTML=b=>b.s?`<span class="st st-${b.av||'none'}"><i></i>${stLabel[b.av]||stLabel.none}</span>`:'';
-const srcTxt=b=>{const c=costTier(b);const m={owned:'Ejet',lib:'Libby · gratis',inc:'Spotify · inkluderet',paid:'BookBeat · inkluderet'};return m[c]||(b.s&&b.s!=='Ingen'?b.s:'');};
+const stHTML=b=>{if(!b.s)return '';if(later(b))return `<span class="st st-later"><i></i>${laterLbl(b)}</span>`;return `<span class="st st-${b.av||'none'}"><i></i>${stLabel[b.av]||stLabel.none}</span>`;};
+const MON=['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+const dShort=d=>`${d.getDate()}. ${MON[d.getMonth()]}`;
+function renewDate(src){try{if(src==='BookBeat'&&BUD.bb&&BUD.bb.periodEnd)return new Date(BUD.bb.periodEnd);
+  if(src==='Spotify'&&BUD.sp&&BUD.sp.daysLeft!=null){const d=new Date();d.setDate(d.getDate()+Math.max(0,+BUD.sp.daysLeft));return d;}}catch(e){}return null;}
+const laterLbl=b=>{const d=renewDate(b.s);return d?`${b.s} fra ${dShort(d)}`:`${b.s} når timerne fornyes`;};
+const whenTxt=b=>later(b)?` (${laterLbl(b).replace(/^\S+ fra/,'på '+b.s+' fra')})`:(b.av==='now'?', klar nu':'');
+const srcTxt=b=>{const c=costTier(b);const m={owned:'Ejet',lib:'Libby · gratis',inc:'Spotify · inkluderet',paid:'BookBeat · inkluderet'};const base=m[c]||(b.s&&b.s!=='Ingen'?b.s:'');const o=(b.alt||[]).filter(x=>x!==b.s);return base+(o.length?` · også ${o.join(', ')}`:'');};
 const hrsTxt=b=>b.hrs?`${fmt(b.hrs)} t`:(b.p?`${b.p} s.`:'');
 function cover(b,cls){const u=COV[b.i];
   if(u)return `<img class="${cls}" src="${u}" alt="" loading="lazy" onerror="this.classList.add('blank')">`;
   let h=0;const t=b.t||'';for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%360;
   const pc=cls==='rcov'?'rcov rph':(cls==='hcov'?'ph hph':'ph');
   return `<div class="${pc}" style="background:hsl(${h} 38% 86%)">${cls==='rcov'?'':(t.length>38?t.slice(0,36)+'…':t)}</div>`;}
-const readBtn=b=>`<button type="button" class="btn readbtn" data-id="${b.i}">Læs nu</button>`;
+const readBtn=b=>`<button type="button" class="btn readbtn" data-id="${b.i}">Læs nu</button><button type="button" class="btn ghost snzbtn" data-id="${b.i}" title="Skjul i 30 dage">Ikke nu</button>`;
 function metaLine(b){return `${b.r!=null?`<span class="star">★ ${b.r.toFixed(2).replace('.',',')}</span>`:''}${stHTML(b)}${b.hrs?`<span>${hrsTxt(b)}</span>`:''}${srcTxt(b)?`<span>${srcTxt(b)}</span>`:''}${b.sp?`<span>🌶 ${b.sp}</span>`:''}`;}
 const escT=t=>String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 function card(label,b,why,cyc,ai,note,rsn){return `<div class="card">${cover(b,'cov')}<div class="body">
   <div class="lblrow"><span class="lbl">${label}${note?` <span class="note">· ${note}</span>`:''}</span></div>
   <div class="bt">${link(b)}</div>
   <div class="au">${b.a||''}${b.se?` · ${b.se}${b.sn?(' #'+b.sn):''}`:''}</div>
-  <div class="why">${why||''}</div>${rsn?`<div class="rsn">${rsn}</div>`:''}
+  <div class="why">${why||''}</div>${rsn?`<div class="rsn">${rsn}</div>`:''}${seriesNote(b)?`<div class="snote">📚 ${seriesNote(b)}</div>`:''}
   <div class="meta">${metaLine(b)}</div>
   <div class="acts">${readBtn(b)}${cyc||''}</div>
 </div></div>`;}
@@ -437,8 +473,29 @@ function card(label,b,why,cyc,ai,note,rsn){return `<div class="card">${cover(b,'
 // CH husker hvilken bog hvert kort viser, saa et kort kun skifter naar dets bog bliver taget af et tidligere kort.
 const CH={};
 const upIds=()=>new Set((window._upnext||[]).map(x=>x.id));
-function choose(key,pool){if(!pool.length){delete CH[key];return null;}let b=pool.find(x=>x.i===CH[key]);if(!b){b=pool[Math.floor(Math.random()*pool.length)];CH[key]=b.i;}return b;}
-function reroll(key,pool){const alt=(pool||[]).filter(x=>x.i!==CH[key]);if(alt.length)CH[key]=alt[Math.floor(Math.random()*alt.length)].i;}
+// ── Variation: husk hvad du har set, og 'Ikke nu' ─────────────────────────────
+// Boeger du har faaet vist de sidste 21 dage vaegtes ned (1/(1+n)^2), og boeger du kan starte i dag vaegtes 2x.
+// 'Ikke nu' skjuler en bog i 30 dage. Alt gemmes kun i denne browser.
+const SEEN_KEY='un_seen_v1',SNZ_KEY='un_snooze_v1',DAY=864e5;
+function jget(k,d){try{return JSON.parse(localStorage.getItem(k)||'null')||d;}catch(e){return d;}}
+function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+let SEEN=jget(SEEN_KEY,{});
+(()=>{const cut=Date.now()-30*DAY;for(const k in SEEN){SEEN[k]=(SEEN[k]||[]).filter(t=>t>cut).slice(-10);if(!SEEN[k].length)delete SEEN[k];}jset(SEEN_KEY,SEEN);})();
+const seenN=id=>(SEEN[id]||[]).filter(t=>t>Date.now()-21*DAY).length;
+const SEEN_NOW=new Set();
+function markSeen(id){if(id==null||SEEN_NOW.has(id))return;SEEN_NOW.add(id);(SEEN[id]=SEEN[id]||[]).push(Date.now());jset(SEEN_KEY,SEEN);}
+const wOf=b=>(ready(b)?2:1)/Math.pow(1+seenN(b.i),2);
+function wpick(pool){const ws=pool.map(wOf);let t=ws.reduce((a,c)=>a+c,0)*Math.random();for(let i=0;i<pool.length;i++){t-=ws[i];if(t<=0)return pool[i];}return pool[pool.length-1];}
+function choose(key,pool){if(!pool.length){delete CH[key];return null;}let b=pool.find(x=>x.i===CH[key]);if(!b){b=wpick(pool);CH[key]=b.i;}return b;}
+function reroll(key,pool){const alt=(pool||[]).filter(x=>x.i!==CH[key]);if(alt.length)CH[key]=wpick(alt).i;}
+let SNZ=jget(SNZ_KEY,{});
+(()=>{const now=Date.now();for(const k in SNZ)if(SNZ[k]<now)delete SNZ[k];jset(SNZ_KEY,SNZ);})();
+const snoozed=id=>!!SNZ[id];
+let SNZ_N=0;
+function snooze(id){SNZ[id]=Date.now()+30*DAY;jset(SNZ_KEY,SNZ);const i=DATA.findIndex(b=>+b.i===+id);if(i>=0){DATA.splice(i,1);SNZ_N++;}
+  for(const k in CH)if(CH[k]===+id)delete CH[k];if(window._heroPick&&+window._heroPick.id===+id)window._heroPick=null;
+  renderPicks();renderNext();update();setSub();}
+function unsnoozeAll(){SNZ={};jset(SNZ_KEY,SNZ);location.reload();}
 const cycBtn=(k,n)=>n>1?`<button type="button" class="btn ghost cyc" data-k="${k}">↻ Træk ny</button>`:'';
 function aiPool(src){return (src&&src.picks?src.picks:[]).filter(pk=>byId[pk.id]&&startable(byId[pk.id])&&srcOK(byId[pk.id])&&reach(byId[pk.id])).map(pk=>Object.assign({},byId[pk.id],{_rsn:pk.reason||''}));}
 function renderPicks(){
@@ -448,15 +505,24 @@ function renderPicks(){
  [['ml','Din stemning',window._ml,'ud fra dine seneste læsninger'],['opp','Noget helt andet',window._opp,'det modsatte af dine seneste læsninger']].forEach(([k,lb,src,note])=>{
    const pool=aiPool(src).filter(b=>!used.has(b.i));const b=choose(k,pool);if(!b)return;used.add(b.i);pools[k]=pool;
    html.push(card(lb,b,b._rsn,cycBtn(k,pool.length),true,note));});
- PICKS.forEach(p=>{const pool=p.pool().filter(srcOK).filter(b=>!used.has(b.i));const b=choose(p.k,pool);if(!b)return;used.add(b.i);pools[p.k]=pool;
+ const prior=[];
+ PICKS.forEach(p=>{const full=p.pool().filter(srcOK);
+   // Overlap: viser kortet stort set de samme boeger som et kort ovenover (>=85%), springes det over.
+   if(!['useit','cont','unavail'].includes(p.k)&&full.length){const ids=full.map(b=>b.i);
+     if(prior.some(S=>ids.filter(i=>S.has(i)).length/ids.length>=0.85))return;}
+   const pool=full.filter(b=>!used.has(b.i));const b=choose(p.k,pool);if(!b)return;used.add(b.i);pools[p.k]=pool;
+   if(!['useit','cont','unavail'].includes(p.k))prior.push(new Set(full.map(x=>x.i)));
    html.push(card(p.lb,b,b.tz?escT(b.tz):p.why(b),cycBtn(p.k,pool.length),false,p.note||'',b.tz?p.why(b):''));});
  host.innerHTML=html.join('');
+ Object.keys(pools).forEach(k=>markSeen(CH[k]));
  host.querySelectorAll('.cyc[data-k]').forEach(btn=>btn.onclick=()=>{reroll(btn.dataset.k,pools[btn.dataset.k]);renderPicks();});
 }
-function applyML(vibe,picks){picks=(picks||[]).filter(p=>alive(p.id));window._ml={vibe:vibe,picks:picks};delete CH.ml;
+const mergeP=(a,b)=>{const s=new Set(),o=[];[...(a||[]),...(b||[])].forEach(p=>{if(p&&!s.has(p.id)){s.add(p.id);o.push(p);}});return o;};
+function applyML(vibe,picks){picks=mergeP(picks,BAKED.picks).filter(p=>alive(p.id));window._ml={vibe:vibe,picks:picks};delete CH.ml;
  const v=document.getElementById('vibe');if(v)v.textContent=vibe||'';renderPicks();}
-function applyOpp(vibe,picks){picks=(picks||[]).filter(p=>alive(p.id));window._opp={vibe:vibe,picks:picks};delete CH.opp;renderPicks();}
+function applyOpp(vibe,picks){picks=mergeP(picks,BAKED_OPP.picks).filter(p=>alive(p.id));window._opp={vibe:vibe,picks:picks};delete CH.opp;renderPicks();}
 document.addEventListener('click',async e=>{
+ const z=e.target.closest('.snzbtn');if(z){snooze(+z.dataset.id);return;}
  const t=e.target.closest('.readbtn');
  if(t){t.disabled=true;t.textContent='Starter…';
    try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add_currently_reading',book_id:+t.dataset.id})});
@@ -467,7 +533,8 @@ document.addEventListener('click',async e=>{
  if(a){const s=a.closest('.upnextwrap').querySelector('.slider');s.scrollBy({left:(+a.dataset.dir)*300,behavior:'smooth'});}
 });
 async function loadML(){
- const cands=DATA.filter(b=>b.r&&startable(b)&&reach(b)).sort((a,b)=>dc(b)-dc(a)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:vibeFirst((b.tg||'').split(',')).slice(0,10).join(','),readers:b.rd,rating:b.r}));
+ const wk=Math.floor(Date.now()/(7*864e5));const hsh=i=>{let h=2166136261^wk;const t=String(i);for(let k=0;k<t.length;k++){h^=t.charCodeAt(k);h=Math.imul(h,16777619);}return h>>>0;};
+ const cands=DATA.filter(b=>startable(b)&&reach(b)).sort((a,b)=>hsh(a.i)-hsh(b.i)).slice(0,150).map(b=>({id:b.i,title:b.t,author:b.a,tags:vibeFirst((b.tg||'').split(',')).slice(0,10).join(','),readers:b.rd,rating:b.r}));
  // Uden for Cowork: hent vibe'en live via workeren, som selv slår dine seneste
  // finishes op og cacher svaret indtil du har læst noget nyt. Fejler det, falder
  // vi tilbage til den bagte vibe fra det ugentlige build.
@@ -536,7 +603,7 @@ function upWhy(b,x){
  return bits.length?bits.join('. ')+'.':'Ligger på din Up Next-liste på Hardcover. Ingen yderligere data om bogen endnu.';
 }
 function renderUpNext(list){
- list=(list||[]).filter(x=>alive(x.id));
+ list=(list||[]).filter(x=>alive(x.id)&&!snoozed(x.id));
  window._upnext=list; renderNext(); const host=document.getElementById('upnext'); if(!host)return;
  if(!list||!list.length){host.innerHTML='';return;}
  list.forEach(x=>{if(x.cover)COV[x.id]=x.cover;});
@@ -545,10 +612,10 @@ function renderUpNext(list){
  host.innerHTML=`<div class="upnextwrap"><div class="unhead"><div><h2 style="margin-top:6px">Din Up Next</h2><p class="h2sub" style="margin-bottom:0">Håndplukket af dig på Hardcover. Hentes live, hver gang siden åbnes.</p></div><div class="arrows"><button type="button" class="arrow" data-dir="-1" aria-label="Forrige">←</button><button type="button" class="arrow" data-dir="1" aria-label="Næste">→</button></div></div><div class="slider">${cards}</div></div>`;
 }
 // Næste bog: næste i en serie du er i gang med (live fra workeren). Findes den ikke, trækkes en bog fra "Brug dine betalte timer"/"Gratis".
-function renderHero(pick){if(pick&&!alive(pick.id))pick=null;window._heroPick=pick;renderNext();}
+function renderHero(pick){if(pick&&(!alive(pick.id)||snoozed(pick.id)))pick=null;window._heroPick=pick;renderNext();}
 // Naeste bog: er der en klar betalt kilde, kommer den foerst. Ellers blandes betalt (fyld-boegerne),
 // gratis/ejet og klar-nu i een pulje, saa helten ikke altid er en af de samme to BookBeat-boeger.
-function nextPool(){const up=upIds();const get=k=>{const p=PICKS.find(x=>x.k===k);return p?p.pool().filter(srcOK).filter(b=>!up.has(b.i)).map(b=>({b,p})):[];};
+function nextPool(){const up=upIds();const get=k=>{const p=PICKS.find(x=>x.k===k);return p?p.pool().filter(srcOK).filter(ready).filter(b=>!up.has(b.i)).map(b=>({b,p})):[];};
  if(budgetState().clear){for(const k of ['useit','free','nowait']){const l=get(k);if(l.length)return l;}return [];}
  const seen=new Set(),mix=[];['useit','free','nowait'].forEach(k=>get(k).forEach(x=>{if(!seen.has(x.b.i)){seen.add(x.b.i);mix.push(x);}}));return mix;}
 function renderNext(){
@@ -581,6 +648,7 @@ function renderNext(){
    <div class="acts">${readBtn(b)}${cyc}</div>
  </div></div>`;
  const nc=document.getElementById('nextcyc');if(nc)nc.onclick=()=>{const old=CH.hero;delete CH.hero;renderNext();if(CH.hero===old&&window._heroPool&&window._heroPool.length>1){reroll('hero',window._heroPool);renderNext();}};
+ markSeen(b.i);
  if(window._heroShownId!==b.i){window._heroShownId=b.i;renderPicks();}
 }
 function renderStatus(){
@@ -617,7 +685,7 @@ function syncUI(){
  document.getElementById('fhVal').textContent=F.fit?'låst til dit budget':(F.maxh>=30?'alle':('≤ '+F.maxh+' t'));
  document.getElementById('fitHint').textContent=F.fit?`Låst, mens "Passer i mine timer" er slået til: BookBeat ${r1!=null?fmt(r1):'–'} t, Spotify ${r2!=null?fmt(r2):'–'} t. Ejede bøger og Libby er ikke begrænset.`:'';
 }
-function resetAll(){Object.assign(F,{now:false,free:false,fit:true,deep:false,series:false,rate:0,spice:0,mood:'',maxh:30,txt:''});document.getElementById('fText').value='';document.getElementById('fHours').value=30;SRCSEL=new Set(SRCS);try{localStorage.removeItem('un_src');}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
+function resetAll(){Object.assign(F,{now:false,free:false,fit:false,deep:false,series:false,rate:0,spice:0,mood:'',maxh:30,txt:''});document.getElementById('fText').value='';document.getElementById('fHours').value=30;SRCSEL=new Set(SRCS);try{localStorage.removeItem('un_src');}catch(e){}renderSrcFilter();renderPicks();renderNext();update();}
 function update(){
  F.txt=fText.value.trim().toLowerCase(); F.maxh=+fHours.value;
  let rows=DATA.filter(b=>{
@@ -634,7 +702,7 @@ function update(){
    if(!F.txt&&!startable(b))return false;
    return true;});
  const sort=F.sort;
- if(sort==='useit')rows.sort((a,b)=>(urgency(b)-urgency(a))||dc(b)-dc(a));
+ if(sort==='useit')rows.sort((a,b)=>(urgency(b)-urgency(a))||(RND(a.i)-RND(b.i)));
  else if(sort==='cheap')rows.sort((a,b)=>(costRank[costTier(a)]-costRank[costTier(b)])||(lbDays(a)-lbDays(b))||dc(b)-dc(a));
  else if(sort==='deep')rows.sort((a,b)=>dc(b)-dc(a));else if(sort==='rating')rows.sort((a,b)=>(b.r||0)-(a.r||0));
  else if(sort==='hours')rows.sort((a,b)=>(a.hrs||999)-(b.hrs||999));else if(sort==='added')rows.sort((a,b)=>(a.d||'9999').localeCompare(b.d||'9999'));
@@ -668,9 +736,9 @@ function wire(){
  [['qNow','now'],['qFree','free'],['qFit','fit'],['qDeep','deep'],['qSeries','series']].forEach(([id,k])=>document.getElementById(id).onclick=()=>{F[k]=!F[k];update();});
  ['fText','fHours'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
 }
-function setSub(){document.getElementById('sub').textContent=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}${LIVE?` · live status ok${HIDDEN_N?` (${HIDDEN_N} skjult)`:''}`:' · live status ikke tilgængelig'}`;}
+function setSub(){const el=document.getElementById('sub');el.innerHTML=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}${LIVE?` · live status ok${HIDDEN_N?` (${HIDDEN_N} skjult)`:''}`:' · live status ikke tilgængelig'}${SNZ_N?` · ${SNZ_N} udsat med “Ikke nu” <button type="button" class="linkbtn" id="unsnz">vis igen</button>`:''}`;const u=document.getElementById('unsnz');if(u)u.onclick=unsnoozeAll;}
 document.getElementById('foot').innerHTML='Deep-cut score = rating + bonus for få læsere, så skjulte perler rykker op over bestsellere. Længde = lydbogstimer. Covers hentes live fra Hardcover. "Din stemning" bygger på dine seneste læsninger, og "Noget helt andet" er det modsatte, så du kan bryde mønsteret. Begge opdateres, når du har læst noget nyt.';
-(async()=>{await applyLive();byId=Object.fromEntries(DATA.map(b=>[b.i,b]));setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();})();
+(async()=>{await applyLive();for(let i=DATA.length-1;i>=0;i--){if(snoozed(DATA[i].i)){DATA.splice(i,1);SNZ_N++;}}applyEffective();byId=Object.fromEntries(DATA.map(b=>[b.i,b]));setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();})();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
