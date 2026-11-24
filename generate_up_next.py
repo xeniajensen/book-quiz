@@ -25,7 +25,7 @@ BAKED = {
     {"id": 1465502, "reason": "Emotional thriller-romance with dark suspense, for the twisty side of your taste."},
   ],
 }
-WORKER = "https://lucky-cloud-343c.xenia-9cc.workers.dev"
+WORKER = "https://hardcover-proxy.xenia-9cc.workers.dev"
 ALL_TBR_LIST = 471213
 UP_NEXT_LIST = 465056   # Xenia's hand-curated "Up Next" list on Hardcover; fetched live each page load
 

@@ -466,7 +466,7 @@ $('restart').addEventListener('click', () => {
 
 // ── Hardcover "Up Next" ──────────────────────────────────────────────────────
 const HC_UP_NEXT_LIST = 465056;
-const HC_WORKER_URL = 'https://lucky-cloud-343c.xenia-9cc.workers.dev';
+const HC_WORKER_URL = 'https://hardcover-proxy.xenia-9cc.workers.dev';
 $('book-list').addEventListener('click', async e => {
   const btn = e.target.closest('.add'); if (!btn || btn.disabled || btn.classList.contains('done')) return;
   btn.disabled = true; btn.textContent = 'Tilføjer …';
