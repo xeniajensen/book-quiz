@@ -573,18 +573,34 @@ async function loadML(){
    applyOpp(oppVibe,opicks.length?opicks:BAKED_OPP.picks);
  }catch(e){ applyML(BAKED.vibe,BAKED.picks); applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks); }
 }
+// Hardcover afviser kald hvis mange kommer samtidigt. Kaldene sendes derfor ét ad gangen,
+// og et kald der fejler eller kommer tomt tilbage (hvor tomt er usandsynligt) prøves igen.
+async function wcall(body,{retryIf,tries=3,timeout=12000}={}){
+ for(let i=0;i<tries;i++){
+  if(i)await new Promise(r=>setTimeout(r,900*i));
+  try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),timeout);
+    const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify(body)});
+    clearTimeout(to);const d=await r.json().catch(()=>null);
+    if(r.ok&&d&&!(retryIf&&retryIf(d)))return d;
+    if(i===tries-1&&r.ok&&d)return d;
+  }catch(e){}
+ }
+ return null;
+}
 async function loadCovers(){
  try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'get_list',list_id:P.list})});
    const d=await r.json();(d.books||[]).forEach(x=>{if(x.cover)COV[x.id]=x.cover;});}catch(e){}
  renderPicks();update();renderHero(window._heroPick||null);renderUpNext(window._upnext);
 }
 async function loadUpNext(){
- try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'get_list',list_id:P.upnext})});
-   const d=await r.json();renderUpNext((d&&d.books)||[]);}catch(e){renderUpNext([]);}
+ // en tom liste er sjælden (du har næsten altid noget på Up Next), så tom = prøv igen
+ const d=await wcall({action:'get_list',list_id:P.upnext},{retryIf:d=>!(d.books&&d.books.length)});
+ renderUpNext((d&&d.books)||[]);
 }
 async function loadNextInSeries(){
- try{const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'next_in_series'})});
-   const d=await r.json(); renderHero(d&&d.pick?d.pick:null);}catch(e){renderHero(null);}
+ // workeren svarer 503 hvis Hardcover throttlede undervejs; pick:null uden fejl er et ægte "ingen næste bog"
+ const d=await wcall({action:'next_in_series'},{retryIf:d=>!d.pick&&(!!d.error||!d._retried&&(d._retried=true)),tries:3});  // også ét ekstra forsøg ved null (den gamle worker skjuler throttling)
+ renderHero(d&&d.pick?d.pick:null);
 }
 // Din Up Next: din håndplukkede liste på Hardcover, hentet live via workeren. Vises altid (omgår pool/startable).
 // Beskrivelse til Up Next-kort: Hardcover-synopsis hvis workeren leverer den, ellers bygget af tags/serie/vurdering.
@@ -738,7 +754,8 @@ function wire(){
 }
 function setSub(){const el=document.getElementById('sub');el.innerHTML=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}${LIVE?` · live status ok${HIDDEN_N?` (${HIDDEN_N} skjult)`:''}`:' · live status ikke tilgængelig'}${SNZ_N?` · ${SNZ_N} udsat med “Ikke nu” <button type="button" class="linkbtn" id="unsnz">vis igen</button>`:''}`;const u=document.getElementById('unsnz');if(u)u.onclick=unsnoozeAll;}
 document.getElementById('foot').innerHTML='Deep-cut score = rating + bonus for få læsere, så skjulte perler rykker op over bestsellere. Længde = lydbogstimer. Covers hentes live fra Hardcover. "Din stemning" bygger på dine seneste læsninger, og "Noget helt andet" er det modsatte, så du kan bryde mønsteret. Begge opdateres, når du har læst noget nyt.';
-(async()=>{await applyLive();for(let i=DATA.length-1;i>=0;i--){if(snoozed(DATA[i].i)){DATA.splice(i,1);SNZ_N++;}}applyEffective();byId=Object.fromEntries(DATA.map(b=>[b.i,b]));setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);loadML();update();loadNextInSeries();loadCovers();loadUpNext();})();
+(async()=>{await applyLive();for(let i=DATA.length-1;i>=0;i--){if(snoozed(DATA[i].i)){DATA.splice(i,1);SNZ_N++;}}applyEffective();byId=Object.fromEntries(DATA.map(b=>[b.i,b]));setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);update();
+ await loadNextInSeries(); await loadUpNext(); await loadCovers(); loadML();})();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
