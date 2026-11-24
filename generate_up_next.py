@@ -217,27 +217,42 @@ input[type=range]{width:200px;accent-color:var(--ink)}
 <script>
 const P=__DATA__; const DATA=P.books.slice(); let RECENT=P.recent; const BAKED=P.baked; const BAKED_OPP=P.bakedOpp||{picks:[]}; const CONT=P.cont||{}; const COV={};
 // ── Live status: skjul bøger der er læst / læses nu / droppet / fjernet fra TBR ──
-const HIDE=new Set(); let LIVE=false; let HIDDEN_N=0;
+const HIDE=new Set(); let LIVE=false; let LIVE_PENDING=true; let HIDDEN_N=0;
 const LS_KEY='upnext_hidden_v1';
 function lsGet(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return [];}}
 function lsAdd(id){try{const a=lsGet();if(!a.includes(id)){a.push(id);localStorage.setItem(LS_KEY,JSON.stringify(a.slice(-300)));}}catch(e){}}
 const alive=id=>!HIDE.has(+id);
-async function applyLive(){
+// Live status kommer fra Hardcover via workeren og tager 5-10 sek. Siden venter IKKE på den:
+// den viser kort med det samme (skjuler straks bøger fra sidste kendte status, gemt i browseren),
+// og når svaret kommer, skjules læste/droppede bøger og siden tegnes igen.
+const LIVE_KEY='upnext_live_v1';
+function pruneHidden(){let n=0;for(let i=DATA.length-1;i>=0;i--){if(HIDE.has(+DATA[i].i)){DATA.splice(i,1);n++;}}HIDDEN_N+=n;return n;}
+function applyLocalHide(){
  lsGet().forEach(id=>HIDE.add(+id));            // lokalt: bøger du lige har trykket 'start' på
+ try{const c=JSON.parse(localStorage.getItem(LIVE_KEY)||'null');      // sidst kendte live status (højst 3 dage gammel)
+   if(c&&Date.now()-c.t<3*864e5)(c.hide||[]).forEach(id=>HIDE.add(+id));}catch(e){}
+ pruneHidden();
+}
+async function applyLive(){
  try{
-  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),7000);
-  const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({action:'tbr_status',ids:DATA.map(b=>b.i)})});
+  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),30000);
+  const all=Object.values(byId).map(b=>b.i);
+  const r=await fetch(P.worker,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({action:'tbr_status',ids:all})});
   clearTimeout(to);const d=await r.json();
-  if(d&&d.ok&&Array.isArray(d.want)&&d.want.length>=DATA.length*0.5){
-    const want=new Set(d.want.map(Number));
-    DATA.forEach(b=>{if(!want.has(+b.i))HIDE.add(+b.i);});
-    (d.done||[]).forEach(id=>HIDE.add(+id));
+  if(d&&d.ok&&Array.isArray(d.want)&&d.want.length>=all.length*0.5){
+    const want=new Set(d.want.map(Number)),done=new Set((d.done||[]).map(Number));
+    const hide=all.filter(id=>!want.has(+id)||done.has(+id));
+    // nyt svar erstatter den gemte status helt (en bog der er tilbage på want-to-read, vises igen)
+    try{localStorage.setItem(LIVE_KEY,JSON.stringify({t:Date.now(),hide}));}catch(e){}
+    hide.forEach(id=>HIDE.add(+id));
+    lsGet().forEach(id=>{if(want.has(+id)&&!done.has(+id))HIDE.delete(+id);});
     LIVE=true;
-    // Står en lokalt skjult bog igen på want-to-read (fx fortrudt), vis den igen
-    lsGet().forEach(id=>{if(want.has(+id)&&!(d.done||[]).includes(+id))HIDE.delete(+id);});
   }
  }catch(e){}
- for(let i=DATA.length-1;i>=0;i--){if(HIDE.has(+DATA[i].i)){DATA.splice(i,1);HIDDEN_N++;}}
+ LIVE_PENDING=false;
+ const n=pruneHidden();
+ setSub();
+ if(n){renderPicks();renderNext();renderUpNext(window._upnext);update();}
 }
 const _re={};
 const has=(b,...kw)=>{const t=(b.tg||'');return kw.some(k=>{const r=_re[k]||(_re[k]=new RegExp('(^|[^a-z])'+k.replace(/[.*+?^${}()|[\]\\\/]/g,'\\$&')+'([^a-z]|$)','i'));return r.test(t);});};
@@ -642,7 +657,9 @@ function renderNext(){
    const onTbr=byId[pick.id];
    b=onTbr||{i:pick.id,t:pick.t,a:pick.a,sl:pick.sl,se:pick.series,sn:pick.snum};
    const f=pick.from||{}; const rated=(f.r!=null)?` (${f.r}★)`:''; const dt=f.date?(' den '+String(f.date).slice(0,10)):'';
-   why=`Du har lige læst “${f.t||'den forrige bog'}”${rated}${dt}. Her er #${pick.snum} i ${pick.series}.`;
+   const rd=pick.reading;
+   why=rd?`Du er i gang med “${rd.t}” (#${rd.pos}) i ${pick.series}, efter “${f.t||'den forrige bog'}”${rated}. Her er #${pick.snum}, klar til bagefter.`
+         :`Du har lige læst “${f.t||'den forrige bog'}”${rated}${dt}. Her er #${pick.snum} i ${pick.series}.`;
    label='Næste bog · næste i din serie';
    if(!onTbr)b=Object.assign({},b,{s:null});
  } else {
@@ -752,10 +769,10 @@ function wire(){
  [['qNow','now'],['qFree','free'],['qFit','fit'],['qDeep','deep'],['qSeries','series']].forEach(([id,k])=>document.getElementById(id).onclick=()=>{F[k]=!F[k];update();});
  ['fText','fHours'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',update);e.addEventListener('change',update);});
 }
-function setSub(){const el=document.getElementById('sub');el.innerHTML=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}${LIVE?` · live status ok${HIDDEN_N?` (${HIDDEN_N} skjult)`:''}`:' · live status ikke tilgængelig'}${SNZ_N?` · ${SNZ_N} udsat med “Ikke nu” <button type="button" class="linkbtn" id="unsnz">vis igen</button>`:''}`;const u=document.getElementById('unsnz');if(u)u.onclick=unsnoozeAll;}
+function setSub(){const el=document.getElementById('sub');el.innerHTML=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}${LIVE?` · live status ok${HIDDEN_N?` (${HIDDEN_N} skjult)`:''}`:(LIVE_PENDING?' · henter live status…':' · live status ikke tilgængelig')}${SNZ_N?` · ${SNZ_N} udsat med “Ikke nu” <button type="button" class="linkbtn" id="unsnz">vis igen</button>`:''}`;const u=document.getElementById('unsnz');if(u)u.onclick=unsnoozeAll;}
 document.getElementById('foot').innerHTML='Deep-cut score = rating + bonus for få læsere, så skjulte perler rykker op over bestsellere. Længde = lydbogstimer. Covers hentes live fra Hardcover. "Din stemning" bygger på dine seneste læsninger, og "Noget helt andet" er det modsatte, så du kan bryde mønsteret. Begge opdateres, når du har læst noget nyt.';
-(async()=>{await applyLive();for(let i=DATA.length-1;i>=0;i--){if(snoozed(DATA[i].i)){DATA.splice(i,1);SNZ_N++;}}applyEffective();byId=Object.fromEntries(DATA.map(b=>[b.i,b]));setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);update();
- await loadNextInSeries(); await loadUpNext(); await loadCovers(); loadML();})();
+(async()=>{byId=Object.fromEntries(DATA.map(b=>[b.i,b]));applyLocalHide();for(let i=DATA.length-1;i>=0;i--){if(snoozed(DATA[i].i)){DATA.splice(i,1);SNZ_N++;}}applyEffective();setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);update();
+ await loadNextInSeries(); await loadUpNext(); await loadCovers(); await applyLive(); loadML();})();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
