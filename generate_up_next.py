@@ -161,6 +161,22 @@ input[type=range]{width:200px;accent-color:var(--ink)}
 .row .rmid{flex:1;min-width:0}
 .row .rmeta{text-align:right;flex:none;display:flex;flex-direction:column;gap:2px;align-items:flex-end;font-size:13px;color:var(--ink2)}
 .foot{margin-top:34px;color:var(--ink2);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+/* Splash mens data hentes */
+#splash{position:fixed;inset:0;z-index:50;background:var(--paper);display:flex;align-items:center;justify-content:center;transition:opacity .35s ease}
+#splash.gone{opacity:0;pointer-events:none}
+#splash .sp-in{width:min(320px,86vw)}
+#splash .sp-title{font-family:var(--serif);font-weight:600;font-size:34px;letter-spacing:-.01em;margin:0 0 4px}
+#splash .sp-sub{color:var(--ink2);font-size:13px;margin:0 0 18px}
+#splash ul{list-style:none;margin:0;padding:0;font-size:14px}
+#splash li{display:flex;align-items:center;gap:10px;padding:5px 0;color:var(--ink2)}
+#splash li.done{color:var(--ink)}
+#splash li i{width:16px;height:16px;flex:none;border-radius:50%;border:2px solid #d9cdb8;border-top-color:var(--acc);animation:spin .8s linear infinite}
+#splash li.wait i{animation:none;border-color:#e7dfd0}
+#splash li.done i{animation:none;border:0;background:var(--ok);position:relative}
+#splash li.done i::after{content:"";position:absolute;left:5px;top:2px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+#splash li.skip i{animation:none;border:0;background:#cfc4ae}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#splash li i{animation:none}#splash{transition:none}}
 /* Din Up Next + serie-række */
 .upnextwrap{margin:0 0 6px}
 .unhead{display:flex;align-items:flex-end;gap:10px}
@@ -178,7 +194,7 @@ input[type=range]{width:200px;accent-color:var(--ink)}
  .row .rmeta{flex-basis:100%;flex-direction:row;flex-wrap:wrap;gap:4px 12px;align-items:center;text-align:left;margin-top:6px;padding-left:53px}
  input[type=range]{width:100%}
 }
-</style></head><body><div class="wrap"><nav class="tabs" aria-label="Sider"><a href="./">Quiz</a><a href="up_next.html" aria-current="page">Up Next</a></nav>
+</style></head><body><div id="splash" role="status" aria-live="polite"><div class="sp-in"><div class="sp-title">Up Next</div><p class="sp-sub">Gør dine forslag klar…</p><ul id="splist"></ul></div></div><div class="wrap"><nav class="tabs" aria-label="Sider"><a href="./">Quiz</a><a href="up_next.html" aria-current="page">Up Next</a></nav>
 <h1>Up Next</h1>
 <p class="sub" id="sub"></p>
 <div class="status" id="statusline"><span>Seneste læsninger: <b id="vibe">Læser dine seneste bøger…</b></span><span id="hoursline"></span><div id="budgetbox" style="flex-basis:100%"></div></div>
@@ -772,7 +788,22 @@ function wire(){
 function setSub(){const el=document.getElementById('sub');el.innerHTML=`${DATA.length} bøger · ${DATA.filter(availNow).length} klar nu · bygget ${P.built||'?'}${BUD.fetched?` · timer hentet ${BUD.fetched}`:''}${LIVE?` · live status ok${HIDDEN_N?` (${HIDDEN_N} skjult)`:''}`:(LIVE_PENDING?' · henter live status…':' · live status ikke tilgængelig')}${SNZ_N?` · ${SNZ_N} udsat med “Ikke nu” <button type="button" class="linkbtn" id="unsnz">vis igen</button>`:''}`;const u=document.getElementById('unsnz');if(u)u.onclick=unsnoozeAll;}
 document.getElementById('foot').innerHTML='Deep-cut score = rating + bonus for få læsere, så skjulte perler rykker op over bestsellere. Længde = lydbogstimer. Covers hentes live fra Hardcover. "Din stemning" bygger på dine seneste læsninger, og "Noget helt andet" er det modsatte, så du kan bryde mønsteret. Begge opdateres, når du har læst noget nyt.';
 (async()=>{byId=Object.fromEntries(DATA.map(b=>[b.i,b]));applyLocalHide();for(let i=DATA.length-1;i>=0;i--){if(snoozed(DATA[i].i)){DATA.splice(i,1);SNZ_N++;}}applyEffective();setSub();renderSrcFilter();buildGroups();wire();renderStatus();renderChips();applyML(BAKED.vibe,BAKED.picks);applyOpp(BAKED_OPP.vibe,BAKED_OPP.picks);update();
- await loadNextInSeries(); await loadUpNext(); await loadCovers(); await applyLive(); loadML();})();
+ // Splash: alt det levende hentes først (ét kald ad gangen, så Hardcover ikke throttler), og siden vises samlet.
+ // Live status tager ~8 sek; den ventes der kun på første gang. Ellers bruges sidste kendte status, og den friske kører bagefter.
+ let liveCached=false;try{const c=JSON.parse(localStorage.getItem(LIVE_KEY)||'null');liveCached=!!(c&&Date.now()-c.t<3*864e5);}catch(e){}
+ const steps=[['hero','Næste bog i din serie',loadNextInSeries],['up','Din Up Next-liste',loadUpNext],['cov','Covers',loadCovers],
+   ['ml','Din stemning lige nu',()=>Promise.race([loadML(),new Promise(r=>setTimeout(r,9000))])]];
+ if(!liveCached)steps.push(['live','Hvad du har læst siden sidst',applyLive]);
+ const ul=document.getElementById('splist');
+ ul.innerHTML=steps.map(([k,l],i)=>`<li id="sp-${k}" class="${i?'wait':''}"><i></i>${l}</li>`).join('');
+ const hideSplash=()=>{const sp=document.getElementById('splash');if(!sp||sp.classList.contains('gone'))return;sp.classList.add('gone');setTimeout(()=>sp.remove(),400);};
+ setTimeout(hideSplash,20000);   // nødbremse: vis siden uanset hvad efter 20 sek
+ for(const [k,,fn] of steps){const li=document.getElementById('sp-'+k);if(li)li.className='';
+   try{await fn();}catch(e){}
+   if(li)li.className='done';}
+ hideSplash();
+ if(liveCached)applyLive();
+})();
 </script></body></html>'''
 HTML = HTML.replace('__DATA__', PAYLOAD)
 open('up_next.html', 'w').write(HTML)
