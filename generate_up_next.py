@@ -216,7 +216,7 @@ input[type=range]{width:200px;accent-color:var(--ink)}
     <button type="button" class="tg" id="qSeries" aria-pressed="false">Serie-starter</button>
   </div>
   <details class="more" id="moreBox"><summary>Flere filtre</summary>
-    <div class="grp"><h3>Adgang</h3><div class="row2" id="fSrc" role="group" aria-label="Kilde"></div><div class="hint">Vælg en eller flere kilder. "Gratis" = ejet eller Libby.</div></div>
+    <div class="grp"><h3>Adgang</h3><div class="row2" id="fSrc" role="group" aria-label="Kilde"></div><div class="hint">Vælg en eller flere kilder. "Gratis" = ejet, Mofibo Unlimited eller Libby.</div></div>
     <div class="grp"><h3>Længde</h3><div class="row2"><label for="fHours">Max timer: <b id="fhVal">alle</b></label><input type="range" id="fHours" min="4" max="30" step="1" value="30"></div><div class="hint" id="fitHint"></div></div>
     <div class="grp"><h3>Bedømmelse</h3><div class="row2" id="fRate" role="group" aria-label="Min. bedømmelse"></div></div>
     <div class="grp"><h3>Spice</h3><div class="row2" id="fSpice" role="group" aria-label="Min. spice"></div></div>
@@ -296,8 +296,10 @@ const seriesNote=b=>(b.sn>1&&!CONT[b.i]&&b.se)?`Bind ${b.sn} i ${b.se}. Romance-
 // ── Kilde-omkostning ─────────────────────────────────────────────────────────
 // owned = Lokal/Audible (ejet, 0 kr). lib = Libby (gratis, men lånekvote/kø).
 // inc = Spotify (12 gratis timer/md i Premium). paid = BookBeat (129 kr/md).
+// unl = Mofibo Unlimited (allerede betalt, ingen timegraense).
 const costTier=b=>{
   if(b.s==='Lokal'||b.s==='Audible') return 'owned';
+  if(b.s==='Mofibo') return 'unl';
   if(b.s==='Libby') return 'lib';
   if(b.s==='Spotify') return 'inc';
   if(b.s==='BookBeat') return 'paid';
@@ -305,7 +307,7 @@ const costTier=b=>{
 };
 // ── Kilde-filter, hurtigfiltre og timer ───────────────────────────────────────
 const srcGroup=b=>(b.s==='Lokal'||b.s==='Audible')?'Ejet':b.s;
-const SRCS=['BookBeat','Spotify','Libby','Ejet','Ingen'];
+const SRCS=['Mofibo','BookBeat','Spotify','Libby','Ejet','Ingen'];
 let SRCSEL=new Set(SRCS);
 try{const sv=JSON.parse(localStorage.getItem('un_src')||'null');if(Array.isArray(sv)){const f=sv.filter(x=>SRCS.includes(x));if(f.length)SRCSEL=new Set(f);}}catch(e){}
 const srcOK=b=>SRCSEL.has(srcGroup(b));
@@ -335,11 +337,11 @@ function renderSrcFilter(){const h=document.getElementById('fSrc');if(!h)return;
     if(SRCSEL.size===SRCS.length){SRCSEL=new Set([k]);}else if(SRCSEL.has(k)){SRCSEL.delete(k);if(!SRCSEL.size)SRCSEL=new Set(SRCS);}else{SRCSEL.add(k);}saveSrc();}));});}
 function saveSrc(){try{localStorage.setItem('un_src',JSON.stringify([...SRCSEL]));}catch(e){}renderSrcFilter();update();}  // kildefilteret gælder kun 'Udforsk din TBR', ikke kortene
 const _rnd={};const RND=i=>_rnd[i]??(_rnd[i]=Math.random());
-const costRank={owned:0,lib:1,inc:2,paid:3,none:4};
-const costLabel={owned:'💰 Ejet',lib:'💰 Gratis (Libby)',inc:'💰 Spotify-timer',paid:'💳 BookBeat',none:''};
+const costRank={owned:0,unl:1,lib:2,inc:3,paid:4,none:5};
+const costLabel={owned:'💰 Ejet',unl:'💰 Mofibo (ubegrænset)',lib:'💰 Gratis (Libby)',inc:'💰 Spotify-timer',paid:'💳 BookBeat',none:''};
 const costPill=b=>{const c=costTier(b);return costLabel[c]?`<span class="badge cost-${c}">${costLabel[c]}</span>`:'';};
 // Gratis og klar til at starte nu: ejet, eller Libby-eksemplar der er ledigt.
-const freeNow=b=>costTier(b)==='owned'||(b.s==='Libby'&&b.av==='now');
+const freeNow=b=>costTier(b)==='owned'||costTier(b)==='unl'||(b.s==='Libby'&&b.av==='now');
 // Spotify har kun få timer tilbage: en bog der er længere end resten kan ikke nås i denne periode.
 const spLeft=()=>BUD.sp?Math.max(0,(BUD.sp.limit||0)-(BUD.sp.used||0)):null;
 const spFits=b=>b.s!=='Spotify'||fitsOwn(b);
@@ -382,7 +384,7 @@ const urgency=b=>{
   if(c==='paid') return fitsOwn(b)?urg('BookBeat'):-5;   // passer ikke i de resterende timer
   if(c==='inc')  return spFits(b)?urg('Spotify'):-5;   // passer ikke i de resterende timer
   if(c==='lib')  return b.av==='now'?0.5:(b.av==='short'?0.2:0.05);
-  if(c==='owned')return 0;
+  if(c==='owned'||c==='unl')return 0;
   return -50;
 };
 // Er der en klar "brug denne kilde"? Samme regler som banneret: en kilde med brugbare bøger
@@ -434,6 +436,7 @@ function applyEffective(){
     if(opts.length<2)return;
     const sc=o=>{const t=Object.assign({},b,{s:o.s,av:o.av});
       if(o.s==='Lokal'||o.s==='Audible')return 100;
+      if(o.s==='Mofibo')return 95;
       if(o.s==='Libby')return o.av==='now'?90:(o.av==='short'?60:20);
       if(o.s==='BookBeat'||o.s==='Spotify')return fitsOwn(t)?80+Math.max(0,urg(o.s)):40;
       return 0;};
@@ -451,7 +454,7 @@ const PICKS=[
    return [];},
   why:b=>{const bd=b.s==='BookBeat'?BUD.bb:BUD.sp;const rem=bd?((bd.limit||0)-(bd.used||0)):null;
    return `Du har ${rem!=null?fmt(rem)+' t ':''}tilbage på ${b.s} i denne periode. Timerne nulstilles, uanset om du bruger dem, så start her før de ejede bøger.`;}},
- {k:'free',lb:'Gratis nu',note:'Libby eller ejet',pool:()=>DATA.filter(b=>freeNow(b)&&startable(b)),why:b=>b.s==='Libby'?(b.s0&&b.s0!=='Libby'?`Står som ${b.s0} på din liste, men er også ledig på Libby nu. Lån den der og spar dine ${b.s0}-timer.`:`Ledig på Libby nu. Det koster ingenting, så lån den, før køen vender tilbage.`):`Du ejer den allerede (${b.s}): ingen kø og ingen abonnementstimer.`},
+ {k:'free',lb:'Gratis nu',note:'Mofibo, Libby eller ejet',pool:()=>DATA.filter(b=>freeNow(b)&&startable(b)),why:b=>b.s==='Libby'?(b.s0&&b.s0!=='Libby'?`Står som ${b.s0} på din liste, men er også ledig på Libby nu. Lån den der og spar dine ${b.s0}-timer.`:`Ledig på Libby nu. Det koster ingenting, så lån den, før køen vender tilbage.`):b.s==='Mofibo'?`Med i dit Mofibo Unlimited: ingen kø og ingen timer at holde øje med.`:`Du ejer den allerede (${b.s}): ingen kø og ingen abonnementstimer.`},
  {k:'nowait',lb:'Ingen ventetid',pool:()=>DATA.filter(b=>availNow(b)&&ready(b)&&startable(b)),why:b=>`Klar på ${b.s} lige nu uden venteliste. Start den, når du vil.`},
  {k:'quick',lb:'Kort lytning',pool:()=>DATA.filter(b=>b.hrs&&b.hrs<=9&&startable(b)),why:b=>`Kun ${fmt(b.hrs)} timer${whenTxt(b)}. Nem at gennemføre.`},
  {k:'wreck',lb:'Knus mig',pool:()=>DATA.filter(b=>startable(b)&&(has(b,'sad','tearjerking','heartbreaking','death / grief','grief')||(has(b,'angst')&&has(b,'emotional')))),why:b=>`Følelsesladet og lidt ødelæggende, til når du vil mærke noget.`},
@@ -472,7 +475,7 @@ const reach=b=>(b.av==='now'||b.av==='short')&&!!b.s&&b.s!=='Ingen';
 const ready=b=>reach(b)&&fitsOwn(b);
 PICKS.forEach(p=>{const o=p.pool;p.pool=()=>o().filter(reach);});
 // Ikke tilgængelig endnu: bøger uden kilde vises som egen ønskeliste-card (omgår reach, de kan jo ikke startes nu).
-PICKS.push({k:'unavail',lb:'Ikke tilgængelig endnu',note:'ønskeliste',pool:()=>DATA.filter(b=>b.s==='Ingen'&&startable(b)),why:b=>`Findes ikke på BookBeat, Spotify eller Libby endnu. Den står på din TBR og dukker op her, når den bliver tilgængelig.`});
+PICKS.push({k:'unavail',lb:'Ikke tilgængelig endnu',note:'ønskeliste',pool:()=>DATA.filter(b=>b.s==='Ingen'&&startable(b)),why:b=>`Findes ikke på Mofibo, BookBeat, Spotify eller Libby endnu. Den står på din TBR og dukker op her, når den bliver tilgængelig.`});
 const idx={};
 const stLabel={now:'Klar nu',short:'Kort ventetid',long:'Lang ventetid',none:'Ikke tilgængelig endnu'};
 const stHTML=b=>{if(!b.s)return '';if(later(b))return `<span class="st st-later"><i></i>${laterLbl(b)}</span>`;return `<span class="st st-${b.av||'none'}"><i></i>${stLabel[b.av]||stLabel.none}</span>`;};
@@ -482,7 +485,7 @@ function renewDate(src){try{if(src==='BookBeat'&&BUD.bb&&BUD.bb.periodEnd)return
   if(src==='Spotify'&&BUD.sp&&BUD.sp.daysLeft!=null){const d=new Date();d.setDate(d.getDate()+Math.max(0,+BUD.sp.daysLeft));return d;}}catch(e){}return null;}
 const laterLbl=b=>{const d=renewDate(b.s);return d?`${b.s} fra ${dShort(d)}`:`${b.s} når timerne fornyes`;};
 const whenTxt=b=>later(b)?` (${laterLbl(b).replace(/^\S+ fra/,'på '+b.s+' fra')})`:(b.av==='now'?', klar nu':'');
-const srcTxt=b=>{const c=costTier(b);const m={owned:'Ejet',lib:'Libby · gratis',inc:'Spotify · inkluderet',paid:'BookBeat · inkluderet'};const base=m[c]||(b.s&&b.s!=='Ingen'?b.s:'');const o=(b.alt||[]).filter(x=>x!==b.s);return base+(o.length?` · også ${o.join(', ')}`:'');};
+const srcTxt=b=>{const c=costTier(b);const m={owned:'Ejet',unl:'Mofibo · ubegrænset',lib:'Libby · gratis',inc:'Spotify · inkluderet',paid:'BookBeat · inkluderet'};const base=m[c]||(b.s&&b.s!=='Ingen'?b.s:'');const o=(b.alt||[]).filter(x=>x!==b.s);return base+(o.length?` · også ${o.join(', ')}`:'');};
 const hrsTxt=b=>b.hrs?`${fmt(b.hrs)} t`:(b.p?`${b.p} s.`:'');
 function cover(b,cls){const u=COV[b.i];
   if(u)return `<img class="${cls}" src="${u}" alt="" loading="lazy" onerror="this.classList.add('blank')">`;
@@ -740,7 +743,7 @@ function update(){
  let rows=DATA.filter(b=>{
    if(!srcOK(b))return false;
    if(F.now&&!availNow(b))return false;
-   if(F.free){const ct=costTier(b);if(!(ct==='owned'||ct==='lib'))return false;}
+   if(F.free){const ct=costTier(b);if(!(ct==='owned'||ct==='unl'||ct==='lib'))return false;}
    if(F.fit){if(!F.txt&&!fitsOwn(b))return false;}else if(F.maxh<30){if(!b.hrs||b.hrs>F.maxh)return false;}
    if(F.rate>0&&(!b.r||b.r<F.rate))return false;
    if(F.spice>0&&(!b.sp||b.sp<F.spice))return false;

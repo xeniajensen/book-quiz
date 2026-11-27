@@ -129,7 +129,7 @@ const BOOKS = [{"t":"The Drowning Woman","a":"Robyn Harding","s":"SP","g":["fict
 // fælles lyttetempo, så den største bunke er ikke altid den rigtige at jage:
 // udløber en mindre bunke først, dør den mens man jager den store. Kun de
 // timer hun realistisk NÅR at bruge (atRisk) tæller — resten er tabt uanset.
-const BUDGET = {"fetched": "2026-11-26", "bb": {"used": 45, "limit": 50, "periodEnd": "2026-12-05", "subscriptionType": "standard", "daysLeft": 9}, "sp": {"used": 12, "limit": 12, "daysLeft": 5}, "libby": {"quotaPerMonth": 3, "note": "Koebenhavn/eReolen Global - verificer i appen under Min side > Laan"}, "avgBookHours": 12.5, "dailyCapacity": 2.0, "dailyCapacityNote": "Realistisk lyttetempo i t/dag. Afledt af BookBeat-forbrug i indevaerende periode (34,1 t / 19 dage = 1,8 t/dag) og rundet op. Er et gulv - taeller ikke Spotify/Libby/ejet. Juster hvis tempoet aendrer sig; generatorerne falder tilbage til 2.0 hvis feltet mangler.", "std": 12.5, "tol": 0.1, "fill": {"bb": [427971, 689229]}};
+const BUDGET = {"fetched": "2026-11-27", "bb": {"used": 45, "limit": 50, "periodEnd": "2026-12-05", "subscriptionType": "standard", "daysLeft": 8}, "sp": {"used": 12, "limit": 12, "daysLeft": 4}, "libby": {"quotaPerMonth": 3, "note": "Koebenhavn/eReolen Global - verificer i appen under Min side > Laan"}, "avgBookHours": 12.5, "dailyCapacity": 2.0, "dailyCapacityNote": "Realistisk lyttetempo i t/dag. Afledt af BookBeat-forbrug i indevaerende periode (34,1 t / 19 dage = 1,8 t/dag) og rundet op. Er et gulv - taeller ikke Spotify/Libby/ejet. Juster hvis tempoet aendrer sig; generatorerne falder tilbage til 2.0 hvis feltet mangler.", "std": 12.5, "tol": 0.1, "fill": {"bb": [427971, 689229]}};
 const CAP = (+BUDGET.dailyCapacity > 0) ? +BUDGET.dailyCapacity : 2.0;  // t/dag
 function remHours(k) {
   const o = BUDGET[k]; if(!o) return null;
@@ -380,7 +380,7 @@ function statusOf(b) {
     if (b.w === 'l') return ['warn', `Lang kø ~${b.wd} dg`, 'Libby'];
     return ['warn', 'Kø', 'Libby'];
   }
-  const nm = {BB:'BookBeat', SP:'Spotify', LK:'Lokal', AB:'Audible'}[b.s];
+  const nm = {BB:'BookBeat', SP:'Spotify', LK:'Lokal', AB:'Audible', MO:'Mofibo'}[b.s];
   return nm ? ['ok', 'Klar nu', nm] : ['', 'Ikke tilgængelig endnu', ''];
 }
 function dots(n) { return `<span class="dots" role="img" aria-label="spice ${n} af 5">${Array.from({length:5},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span>`; }

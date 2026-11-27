@@ -41,7 +41,7 @@ def build_data():
             sl = str(spice_raw).split(' - ', 1)[1][:30]
 
         src = {'BookBeat':'BB','Libby':'LB','Spotify':'SP','Lokal':'LK',
-               'Audible':'AB','Ingen':'–'}.get(source, '–')
+               'Audible':'AB','Mofibo':'MO','Ingen':'–'}.get(source, '–')
 
         # Libby-ventestatus fra kolonne N -> 'a' ledig / 'k' kort / 'l' lang
         wait = ''
@@ -448,7 +448,7 @@ function statusOf(b) {
     if (b.w === 'l') return ['warn', `Lang kø ~${b.wd} dg`, 'Libby'];
     return ['warn', 'Kø', 'Libby'];
   }
-  const nm = {BB:'BookBeat', SP:'Spotify', LK:'Lokal', AB:'Audible'}[b.s];
+  const nm = {BB:'BookBeat', SP:'Spotify', LK:'Lokal', AB:'Audible', MO:'Mofibo'}[b.s];
   return nm ? ['ok', 'Klar nu', nm] : ['', 'Ikke tilgængelig endnu', ''];
 }
 function dots(n) { return `<span class="dots" role="img" aria-label="spice ${n} af 5">${Array.from({length:5},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span>`; }
